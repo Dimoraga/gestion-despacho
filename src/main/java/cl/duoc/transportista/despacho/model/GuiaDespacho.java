@@ -1,0 +1,26 @@
+package cl.duoc.transportista.despacho.model;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "guia_despacho")
+@Getter
+@Setter
+@NoArgsConstructor
+public class GuiaDespacho {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long numeroGuia;
+
+    private String transportista;
+    private LocalDate fecha;
+    private String destino;
+    private String pedido;
+    private String archivoKey;
+    private String efsPath;
+}

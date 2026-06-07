@@ -1,0 +1,15 @@
+services:
+  app:
+    image: ${APP_IMAGE:-dalvaes/gestion-despacho:latest}
+    container_name: gestion-despacho
+    ports: ["8080:8080"]
+    volumes:
+      - /mnt/efs:/app/efs
+    environment:
+      APP_EFS_DIR: ${APP_EFS_DIR:-/app/efs}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    restart: unless-stopped
