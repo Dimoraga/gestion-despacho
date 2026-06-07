@@ -1,6 +1,6 @@
 # gestion-despacho
 
-Sistema de Gestión de Pedidos y Generación de Guías de Despacho para empresa transportista. Cada guía se genera como PDF con OpenPDF, se almacena temporalmente en EFS y se sube automáticamente a S3 en carpetas organizadas por fecha y transportista. Expone un API REST documentada con Swagger y se despliega mediante Docker con CI/CD en EC2. 
+Sistema de Gestión de Pedidos y Generación de Guías de Despacho para empresa transportista. Cada guía se genera como PDF con OpenPDF, se almacena temporalmente en EFS y se sube automáticamente a S3 en carpetas organizadas por fecha y transportista. Expone un API REST documentada con Swagger y se despliega mediante Docker con CI/CD en EC2.   
 
 ## Stack
 
