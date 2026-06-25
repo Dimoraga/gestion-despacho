@@ -1,5 +1,8 @@
 package cl.duoc.transportista.despacho.controller;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+
 import cl.duoc.transportista.despacho.dto.GuiaRequest;
 import cl.duoc.transportista.despacho.dto.GuiaResponse;
 import cl.duoc.transportista.despacho.service.GuiaDespachoService;
@@ -51,7 +54,14 @@ public class GuiaController {
     @GetMapping("/{id}/s3")
     public ResponseEntity<byte[]> descargarDeS3(
             @PathVariable Long id,
-            @RequestHeader("X-Transportista") String solicitante) {
+            @AuthenticationPrincipal Jwt jwt) {
+
+        // La identidad viene del token firmado por Azure, no de un header falsificable
+        String solicitante = jwt.getClaimAsString("preferred_username");
+        if (solicitante == null || solicitante.isBlank()) {
+            solicitante = jwt.getClaimAsString("name");
+        }
+
         byte[] pdf = service.descargarDeS3(id, solicitante);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
