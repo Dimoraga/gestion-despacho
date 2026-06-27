@@ -16,4 +16,5 @@ services:
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
       AZURE_B2C_USER_FLOW: ${AZURE_B2C_USER_FLOW:-B2C_1_signupsignin}
       AZURE_ISSUER_URI: ${AZURE_ISSUER_URI:-}
+      AZURE_JWK_SET_URI: ${AZURE_JWK_SET_URI:-}
     restart: unless-stopped

@@ -80,6 +80,7 @@ jobs:
             AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
             AZURE_B2C_USER_FLOW=${{ secrets.AZURE_B2C_USER_FLOW }}
             AZURE_ISSUER_URI=${{ secrets.AZURE_ISSUER_URI }}
+            AZURE_JWK_SET_URI=${{ secrets.AZURE_JWK_SET_URI }}
             EOF
             cd ~
             docker compose pull app
