@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/guias")
@@ -61,12 +62,25 @@ public class GuiaController {
         if (solicitante == null || solicitante.isBlank()) {
             solicitante = jwt.getClaimAsString("name");
         }
+        if ((solicitante == null || solicitante.isBlank()) && tieneRolGestor(jwt)) {
+            solicitante = service.obtener(id).transportista();
+        }
 
         byte[] pdf = service.descargarDeS3(id, solicitante);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=guia" + id + ".pdf")
                 .body(pdf);
+    }
+
+    private boolean tieneRolGestor(Jwt jwt) {
+        List<String> roles = jwt.getClaimAsStringList("roles");
+        if (roles == null) {
+            return false;
+        }
+        return roles.stream()
+                .map(role -> role.toUpperCase(Locale.ROOT))
+                .anyMatch(role -> role.equals("GESTOR") || role.equals("GESTION") || role.equals("ADMIN"));
     }
 
     @PutMapping("/{id}")
