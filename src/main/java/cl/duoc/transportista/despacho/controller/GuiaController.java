@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/guias")
@@ -62,7 +61,10 @@ public class GuiaController {
         if (solicitante == null || solicitante.isBlank()) {
             solicitante = jwt.getClaimAsString("name");
         }
-        if ((solicitante == null || solicitante.isBlank()) && tieneRolGestor(jwt)) {
+        if (solicitante == null || solicitante.isBlank()) {
+            // Token de app/servicio (client credentials) sin identidad de usuario.
+            // El rol (DESCARGADOR o GESTOR) ya fue validado en SecurityConfig, por lo que
+            // la descarga se autoriza tomando el transportista de la propia guia.
             solicitante = service.obtener(id).transportista();
         }
 
@@ -71,16 +73,6 @@ public class GuiaController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=guia" + id + ".pdf")
                 .body(pdf);
-    }
-
-    private boolean tieneRolGestor(Jwt jwt) {
-        List<String> roles = jwt.getClaimAsStringList("roles");
-        if (roles == null) {
-            return false;
-        }
-        return roles.stream()
-                .map(role -> role.toUpperCase(Locale.ROOT))
-                .anyMatch(role -> role.equals("GESTOR") || role.equals("GESTION") || role.equals("ADMIN"));
     }
 
     @PutMapping("/{id}")
