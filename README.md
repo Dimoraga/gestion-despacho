@@ -13,6 +13,7 @@ Sistema de Gestión de Pedidos y Generación de Guías de Despacho para una empr
 | Generación PDF | OpenPDF (`com.github.librepdf:openpdf`) |
 | Documentación API | springdoc-openapi (Swagger UI) |
 | Health / métricas | spring-boot-starter-actuator (`/actuator/health`) |
+| Seguridad | Spring Security OAuth2 Resource Server JWT + Azure AD B2C |
 | Empaquetado | Docker multistage (`maven:3.9-eclipse-temurin-17` → `eclipse-temurin:17-jre-jammy`, usuario no-root) |
 
 ---
@@ -88,8 +89,48 @@ Copiar `.env.example` a `.env` y completar (ver `docker-compose.yml`):
 | `AWS_S3_BUCKET` | *(requerido)* | Nombre del bucket S3 |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | *(vacío con LabRole)* | Credenciales Learner Lab; pueden omitirse si la EC2 usa LabRole (se resuelven vía IMDS) |
 | `SPRING_DATASOURCE_URL` | `jdbc:h2:mem:guias;DB_CLOSE_DELAY=-1` | URL H2 (usar `jdbc:h2:file:./data/guias` para persistencia) |
+| `AZURE_TENANT_ID` | *(requerido)* | Tenant Azure AD B2C, por ejemplo `miduocb2c.onmicrosoft.com` |
+| `AZURE_CLIENT_ID` | *(requerido)* | Application/API Client ID usado como audiencia del access token |
+| `AZURE_B2C_USER_FLOW` | `B2C_1_signupsignin` | User flow/policy usado para login y emisión de tokens |
+| `AZURE_JWK_SET_URI` | *(requerido)* | URL de llaves públicas B2C para validar la firma JWT |
 
 > Nunca se hardcodean credenciales AWS en el código ni en `docker-compose.yml`. El `.env` real está en `.gitignore` y no se versiona.
+
+### Seguridad JWT / Azure AD B2C
+
+La aplicación **no emite tokens**: funciona como **OAuth2 Resource Server**. Postman debe pedir el access token directamente a Azure AD B2C y luego enviarlo como `Authorization: Bearer <token>`.
+
+Claims aceptados para autorización:
+
+- `roles`: `DESCARGADOR` o `GESTOR`.
+- `extension_consultaRole`: también acepta `consulta`, `descarga`, `descargador`, `gestion`, `gestor` o `admin`.
+- `scp`: útil si Azure entrega permisos como scopes separados por espacio.
+
+Mapeo de permisos:
+
+| Rol/claim | Permisos |
+|---|---|
+| `DESCARGADOR` / `consulta` / `descarga` | Solo `GET /api/guias/{id}/s3` |
+| `GESTOR` / `gestion` / `admin` | Todos los endpoints `/api/guias/**`, incluida descarga |
+
+Configuración Postman recomendada para obtener token desde B2C:
+
+1. Crear/exponer una API en Azure AD B2C y definir un scope, por ejemplo `guia.readwrite`.
+2. Crear un App Registration para Postman y habilitar redirect URI `https://oauth.pstmn.io/v1/callback`.
+3. En Postman → Authorization → OAuth 2.0:
+   - Grant Type: `Authorization Code`.
+   - Auth URL: `https://<tenant>.b2clogin.com/<tenant>.onmicrosoft.com/<policy>/oauth2/v2.0/authorize`.
+   - Access Token URL: `https://<tenant>.b2clogin.com/<tenant>.onmicrosoft.com/<policy>/oauth2/v2.0/token`.
+   - Client ID/Secret: los del App Registration de Postman.
+   - Scope: `openid offline_access https://<tenant>.onmicrosoft.com/<api-client-id-or-app-id-uri>/guia.readwrite`.
+4. Verificar el token en `https://jwt.ms`: debe traer `aud` de la API y algún claim de rol (`roles`, `extension_consultaRole` o `scp`).
+
+Evidencias esperadas para la S6:
+
+- Sin token: `401 Unauthorized`.
+- Token válido sin rol suficiente: `403 Forbidden`.
+- Token con `DESCARGADOR`/`consulta`: descarga PDF `200 OK`, pero creación/edición `403`.
+- Token con `GESTOR`/`gestion`: creación/edición/descarga `200` o `201`.
 
 ---
 
