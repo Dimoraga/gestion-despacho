@@ -4,8 +4,9 @@ services:
     container_name: gestion-despacho
     ports: ["8080:8080"]
     volumes:
-      - /mnt/efs:/app/efs
+      - ${HOST_EFS_DIR:-/mnt/efs}:/app/efs
     environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
       APP_EFS_DIR: ${APP_EFS_DIR:-/app/efs}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
@@ -17,4 +18,34 @@ services:
       AZURE_B2C_USER_FLOW: ${AZURE_B2C_USER_FLOW:-B2C_1_signupsignin}
       AZURE_ISSUER_URI: ${AZURE_ISSUER_URI:-}
       AZURE_JWK_SET_URI: ${AZURE_JWK_SET_URI:-}
+      SPRING_RABBITMQ_HOST: ${SPRING_RABBITMQ_HOST:-rabbitmq}
+      SPRING_RABBITMQ_PORT: ${SPRING_RABBITMQ_PORT:-5672}
+      SPRING_RABBITMQ_USERNAME: ${SPRING_RABBITMQ_USERNAME:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${SPRING_RABBITMQ_PASSWORD:-guest}
+      APP_RABBITMQ_QUEUE: ${APP_RABBITMQ_QUEUE:-guia-despacho.queue}
+      APP_RABBITMQ_EXCHANGE: ${APP_RABBITMQ_EXCHANGE:-guia-despacho.exchange}
+      APP_RABBITMQ_ROUTING_KEY: ${APP_RABBITMQ_ROUTING_KEY:-guia-despacho.creada}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:h2:mem:guias;DB_CLOSE_DELAY=-1}
+      SPRING_DATASOURCE_DRIVER: ${SPRING_DATASOURCE_DRIVER:-org.h2.Driver}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-sa}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: gestion-despacho-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${SPRING_RABBITMQ_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${SPRING_RABBITMQ_PASSWORD:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped

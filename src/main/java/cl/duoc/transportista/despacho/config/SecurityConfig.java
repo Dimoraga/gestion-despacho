@@ -2,6 +2,7 @@ package cl.duoc.transportista.despacho.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -25,6 +26,7 @@ import java.util.stream.Stream;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@Profile("!local")
 public class SecurityConfig {
 
     @Bean
@@ -33,7 +35,6 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Rutas públicas
                 .requestMatchers(
                     "/swagger-ui/**",
                     "/swagger-ui.html",
@@ -42,11 +43,9 @@ public class SecurityConfig {
                     "/actuator/health"
                 ).permitAll()
 
-                // ROLE_DESCARGADOR y ROLE_GESTOR pueden descargar
                 .requestMatchers(HttpMethod.GET, "/api/guias/*/s3")
                     .hasAnyRole("DESCARGADOR", "GESTOR")
 
-                // Solo ROLE_GESTOR puede usar el resto
                 .requestMatchers("/api/guias/**")
                     .hasRole("GESTOR")
 

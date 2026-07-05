@@ -8,3 +8,5 @@ target/
 .env.*
 *.log
 HELP.md
+.omc/
+evidencias_s*/
