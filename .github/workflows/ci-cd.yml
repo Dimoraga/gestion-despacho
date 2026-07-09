@@ -25,7 +25,12 @@ jobs:
       - name: Dar permiso de ejecución a mvnw
         run: chmod +x mvnw
 
-      - run: ./mvnw -B test
+      - name: Test productor
+        run: ./mvnw -B test
+
+      - name: Test consumidor
+        working-directory: gestion-despacho-consumidor
+        run: mvn -B test
 
   build-and-deploy:
     needs: test
@@ -41,15 +46,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: Build y push productor
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=productor
+          cache-to: type=gha,mode=max,scope=productor
+
+      - name: Build y push consumidor
+        uses: docker/build-push-action@v6
+        with:
+          context: ./gestion-despacho-consumidor
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:${{ github.sha }}
+          cache-from: type=gha,scope=consumidor
+          cache-to: type=gha,mode=max,scope=consumidor
 
       - name: Copiar docker-compose.yml a la EC2
         uses: appleboy/scp-action@v0.1.7
@@ -70,6 +87,7 @@ jobs:
             set -e
             cat > ~/.env <<'EOF'
             APP_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho:${{ github.sha }}
+            CONSUMIDOR_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:${{ github.sha }}
             APP_EFS_DIR=/app/efs
             AWS_REGION=${{ secrets.AWS_REGION }}
             AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
@@ -78,6 +96,6 @@ jobs:
             AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
             EOF
             cd ~
-            docker compose pull app
+            docker compose pull app consumidor
             docker compose up -d
             docker image prune -f

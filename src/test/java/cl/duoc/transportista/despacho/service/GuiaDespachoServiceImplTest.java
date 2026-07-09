@@ -36,6 +36,9 @@ class GuiaDespachoServiceImplTest {
     @Mock
     S3StorageService s3;
 
+    @Mock
+    GuiaQueuePublisher queuePublisher;
+
     @TempDir
     Path tmpEfs;
 
@@ -47,7 +50,7 @@ class GuiaDespachoServiceImplTest {
     void setUp() {
         efs = new EfsStorageService();
         ReflectionTestUtils.setField(efs, "efsDir", tmpEfs.toString());
-        service = new GuiaDespachoServiceImpl(repo, pdfService, s3, efs);
+        service = new GuiaDespachoServiceImpl(repo, pdfService, s3, efs, queuePublisher);
 
         guia = new GuiaDespacho();
         guia.setNumeroGuia(123L);
