@@ -1,5 +1,6 @@
 package cl.duoc.transportista.despacho.service;
 
+import cl.duoc.transportista.despacho.dto.GuiaColaMensaje;
 import cl.duoc.transportista.despacho.dto.GuiaRequest;
 import cl.duoc.transportista.despacho.dto.GuiaResponse;
 import cl.duoc.transportista.despacho.exception.AccesoDenegadoException;
@@ -23,13 +24,15 @@ public class GuiaDespachoServiceImpl implements GuiaDespachoService {
     private final GuiaPdfService pdfService;
     private final S3StorageService s3;
     private final EfsStorageService efs;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     public GuiaDespachoServiceImpl(GuiaDespachoRepository repo, GuiaPdfService pdfService,
-                                   S3StorageService s3, EfsStorageService efs) {
+                                   S3StorageService s3, EfsStorageService efs, org.springframework.context.ApplicationEventPublisher eventPublisher) {
         this.repo = repo;
         this.pdfService = pdfService;
         this.s3 = s3;
         this.efs = efs;
+        this.eventPublisher = eventPublisher;
     }
 
     private String buildKey(GuiaDespacho g) {
@@ -55,7 +58,10 @@ public class GuiaDespachoServiceImpl implements GuiaDespachoService {
         g.setPedido(request.pedido());
         repo.save(g);
         subirAS3(g.getNumeroGuia());
-        return toResponse(buscar(g.getNumeroGuia()));
+        GuiaResponse response = toResponse(buscar(g.getNumeroGuia()));
+        eventPublisher.publishEvent(new GuiaCreadaEvent(new GuiaColaMensaje(response.numeroGuia(), response.transportista(),
+                response.fecha(), response.destino(), response.pedido(), response.archivoKey())));
+        return response;
     }
 
     @Override

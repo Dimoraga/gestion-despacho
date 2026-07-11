@@ -36,6 +36,9 @@ class GuiaDespachoServiceImplTest {
     @Mock
     S3StorageService s3;
 
+    @Mock
+    org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @TempDir
     Path tmpEfs;
 
@@ -47,7 +50,7 @@ class GuiaDespachoServiceImplTest {
     void setUp() {
         efs = new EfsStorageService();
         ReflectionTestUtils.setField(efs, "efsDir", tmpEfs.toString());
-        service = new GuiaDespachoServiceImpl(repo, pdfService, s3, efs);
+        service = new GuiaDespachoServiceImpl(repo, pdfService, s3, efs, eventPublisher);
 
         guia = new GuiaDespacho();
         guia.setNumeroGuia(123L);

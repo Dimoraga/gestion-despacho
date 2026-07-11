@@ -2,14 +2,19 @@ package cl.duoc.transportista.despacho.controller;
 
 import cl.duoc.transportista.despacho.dto.GuiaResponse;
 import cl.duoc.transportista.despacho.exception.AccesoDenegadoException;
+import cl.duoc.transportista.despacho.security.SecurityConfig;
+import cl.duoc.transportista.despacho.security.SecurityRoles;
 import cl.duoc.transportista.despacho.service.GuiaDespachoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -23,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(GuiaController.class)
+@Import(SecurityConfig.class)
 class GuiaControllerTest {
 
     @Autowired
@@ -33,6 +39,14 @@ class GuiaControllerTest {
 
     @Autowired
     ObjectMapper objectMapper;
+
+    private static RequestPostProcessor gestion() {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS));
+    }
+
+    private static RequestPostProcessor descarga() {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.DESCARGA_GUIAS));
+    }
 
     @Test
     void crearGuia_retorna201ConLocation() throws Exception {
@@ -49,8 +63,7 @@ class GuiaControllerTest {
                 """;
 
         mockMvc.perform(post("/api/guias")
-                        .with(jwt().authorities(
-                            new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_GESTOR")))
+                        .with(gestion())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
@@ -58,17 +71,48 @@ class GuiaControllerTest {
     }
 
     @Test
+    void crearGuia_sinAutenticacion_retorna401() throws Exception {
+        String body = """
+                {
+                  "transportista": "transportistaX",
+                  "fecha": "2021-03-15",
+                  "destino": "Santiago",
+                  "pedido": "PED-001"
+                }
+                """;
+
+        mockMvc.perform(post("/api/guias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void crearGuia_conRolDescarga_retorna403() throws Exception {
+        String body = """
+                {
+                  "transportista": "transportistaX",
+                  "fecha": "2021-03-15",
+                  "destino": "Santiago",
+                  "pedido": "PED-001"
+                }
+                """;
+
+        mockMvc.perform(post("/api/guias")
+                        .with(jwt().jwt(j -> j.claim("preferred_username", "transportistaX")).authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.DESCARGA_GUIAS)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void descargarDeS3_transportistaAutorizado_retorna200() throws Exception {
         when(service.descargarDeS3(eq(1L), eq("transportistaX"))).thenReturn(new byte[]{1});
 
         mockMvc.perform(get("/api/guias/1/s3")
-                .with(jwt()
-                    .jwt(j -> j.claim("preferred_username", "transportistaX"))
-                    .authorities(
-                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_DESCARGADOR"))))
-        .andExpect(status().isOk());
-
-        
+                        .with(jwt().jwt(j -> j.claim("preferred_username", "transportistaX")).authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.DESCARGA_GUIAS)))
+                        .header("X-Transportista", "transportistaX"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -77,11 +121,17 @@ class GuiaControllerTest {
                 .thenThrow(new AccesoDenegadoException("no"));
 
         mockMvc.perform(get("/api/guias/1/s3")
-                .with(jwt()
-                    .jwt(j -> j.claim("preferred_username", "otro"))
-                    .authorities(
-                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_DESCARGADOR"))))
-        .andExpect(status().isForbidden());
+                        .with(jwt().jwt(j -> j.claim("preferred_username", "otro")).authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.DESCARGA_GUIAS)))
+                        .header("X-Transportista", "otro"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void descargarDeS3_conRolGestion_retorna403() throws Exception {
+        mockMvc.perform(get("/api/guias/1/s3")
+                        .with(gestion())
+                        .header("X-Transportista", "transportistaX"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -99,8 +149,7 @@ class GuiaControllerTest {
                 """;
 
         mockMvc.perform(put("/api/guias/1")
-                        .with(jwt().authorities(
-                            new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_GESTOR")))
+                        .with(gestion())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk());
@@ -108,9 +157,7 @@ class GuiaControllerTest {
 
     @Test
     void eliminarGuia_retorna204() throws Exception {
-        mockMvc.perform(delete("/api/guias/1")
-                        .with(jwt().authorities(
-                            new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_GESTOR"))))
+        mockMvc.perform(delete("/api/guias/1").with(gestion()))
                 .andExpect(status().isNoContent());
 
         verify(service).eliminar(1L);
@@ -122,8 +169,7 @@ class GuiaControllerTest {
         when(service.historial("transportistaX", LocalDate.of(2021, 3, 15))).thenReturn(List.of(resp));
 
         mockMvc.perform(get("/api/guias")
-                        .with(jwt().authorities(
-                            new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_GESTOR")))
+                        .with(gestion())
                         .param("transportista", "transportistaX")
                         .param("fecha", "2021-03-15"))
                 .andExpect(status().isOk())
