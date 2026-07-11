@@ -13,6 +13,7 @@ Sistema de Gestión de Pedidos y Generación de Guías de Despacho para una empr
 | Generación PDF | OpenPDF (`com.github.librepdf:openpdf`) |
 | Documentación API | springdoc-openapi (Swagger UI) |
 | Health / métricas | spring-boot-starter-actuator (`/actuator/health`) |
+| Mensajería | RabbitMQ: POST `/api/guias` publica tras commit; consumidor procesa `/api/guias/cola/procesar` |
 | Seguridad | Spring Security OAuth2 Resource Server JWT + Azure AD B2C |
 | Empaquetado | Docker multistage (`maven:3.9-eclipse-temurin-17` → `eclipse-temurin:17-jre-jammy`, usuario no-root) |
 
@@ -93,6 +94,7 @@ Copiar `.env.example` a `.env` y completar (ver `docker-compose.yml`):
 | `AZURE_CLIENT_ID` | *(requerido)* | Application/API Client ID usado como audiencia del access token |
 | `AZURE_B2C_USER_FLOW` | `B2C_1_signupsignin` | User flow/policy usado para login y emisión de tokens |
 | `AZURE_JWK_SET_URI` | *(requerido)* | URL de llaves públicas B2C para validar la firma JWT |
+| `AZURE_ROLES_CLAIM` | `roles` | Claim JWT usado para roles |
 
 > Nunca se hardcodean credenciales AWS en el código ni en `docker-compose.yml`. El `.env` real está en `.gitignore` y no se versiona.
 
@@ -138,7 +140,7 @@ Evidencias esperadas para la S6:
 
 | Método | Ruta | Acción |
 |---|---|---|
-| `POST` | `/api/guias` | Crea la guía y sube el PDF a EFS → S3 (201 + Location) |
+| `POST` | `/api/guias` | Crea la guía, sube PDF a EFS → S3 y publica RabbitMQ tras commit (201 + Location) |
 | `POST` | `/api/guias/{id}/s3` | Sube o re-sube la guía a S3 (misma key) |
 | `GET` | `/api/guias` | Historial filtrable (`?transportista=&fecha=`) |
 | `GET` | `/api/guias/{id}` | Metadata de la guía |

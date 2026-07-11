@@ -16,10 +16,10 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${azure.ad.b2c.jwk-set-uri}")
+    @Value("${app.azure.jwk-set-uri}")
     private String jwkSetUri;
 
-    @Value("${azure.ad.b2c.roles-claim:roles}")
+    @Value("${app.azure.roles-claim:roles}")
     private String rolesClaim;
 
     @Bean

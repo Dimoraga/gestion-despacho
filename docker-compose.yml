@@ -16,6 +16,8 @@ services:
       AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
       AZURE_JWK_SET_URI: ${AZURE_JWK_SET_URI:-}
+      AZURE_B2C_USER_FLOW: ${AZURE_B2C_USER_FLOW:-B2C_1_signupsignin}
+      AZURE_ROLES_CLAIM: ${AZURE_ROLES_CLAIM:-roles}
     depends_on:
       rabbitmq: { condition: service_healthy }
     restart: unless-stopped
@@ -29,6 +31,11 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-admin}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-admin123}
+      AZURE_JWK_SET_URI: ${AZURE_JWK_SET_URI:-}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      AZURE_B2C_USER_FLOW: ${AZURE_B2C_USER_FLOW:-B2C_1_signupsignin}
+      AZURE_ROLES_CLAIM: ${AZURE_ROLES_CLAIM:-roles}
     depends_on:
       rabbitmq: { condition: service_healthy }
     restart: unless-stopped

@@ -99,6 +99,7 @@ jobs:
             AZURE_B2C_USER_FLOW=${{ secrets.AZURE_B2C_USER_FLOW }}
             AZURE_ISSUER_URI=${{ secrets.AZURE_ISSUER_URI }}
             AZURE_JWK_SET_URI=${{ secrets.AZURE_JWK_SET_URI }}
+            AZURE_ROLES_CLAIM=${{ secrets.AZURE_ROLES_CLAIM || 'roles' }}
             EOF
             cd ~
             docker compose pull app consumidor
