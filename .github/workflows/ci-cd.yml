@@ -94,9 +94,10 @@ jobs:
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
+            RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
+            RABBITMQ_PASS=${{ secrets.RABBITMQ_PASS }}
             AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}
             AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
-            AZURE_B2C_USER_FLOW=${{ secrets.AZURE_B2C_USER_FLOW }}
             AZURE_ISSUER_URI=${{ secrets.AZURE_ISSUER_URI }}
             AZURE_JWK_SET_URI=${{ secrets.AZURE_JWK_SET_URI }}
             AZURE_ROLES_CLAIM=${{ secrets.AZURE_ROLES_CLAIM || 'roles' }}
