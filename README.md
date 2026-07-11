@@ -1,201 +1,66 @@
-# gestion-despacho
+# gestión-despacho
 
-Sistema de Gestión de Pedidos y Generación de Guías de Despacho para empresa transportista. Cada guía se genera como PDF con OpenPDF, se almacena temporalmente en EFS y se sube automáticamente a S3 en carpetas organizadas por fecha y transportista. Expone un API REST documentada con Swagger y se despliega mediante Docker con CI/CD en EC2.   
+Sistema de Gestión de Pedidos y Generación de Guías de Despacho para una empresa transportista. Cada guía se genera como **PDF** (OpenPDF), se almacena temporalmente en **EFS** y se sube automáticamente a **Amazon S3** en carpetas organizadas por fecha y transportista. Expone una **API REST** documentada con Swagger, se empaqueta con **Docker** y se despliega en **EC2** mediante un pipeline de **CI/CD** (GitHub Actions).
 
 ## Stack
 
-| Componente | Versión |
+| Componente | Versión / Detalle |
 |---|---|
-| Spring Boot | 3.5.14 |
-| Java | 17 (temurin) |
+| Spring Boot | 3.5.x |
+| Java | 17 (Temurin) |
 | Base de datos | H2 embebido |
 | AWS SDK | v2 (`software.amazon.awssdk:s3`) |
 | Generación PDF | OpenPDF (`com.github.librepdf:openpdf`) |
-| Documentación API | springdoc-openapi-starter-webmvc-ui |
+| Documentación API | springdoc-openapi (Swagger UI) |
 | Health / métricas | spring-boot-starter-actuator (`/actuator/health`) |
-| Build | Maven en imagen `maven:3.9-eclipse-temurin-17` (Docker multistage) |
-| Imagen runtime | `eclipse-temurin:17-jre-jammy`, usuario no-root, layered JAR |
+| Seguridad | Spring Security OAuth2 Resource Server JWT + Azure AD B2C |
+| Empaquetado | Docker multistage (`maven:3.9-eclipse-temurin-17` → `eclipse-temurin:17-jre-jammy`, usuario no-root) |
 
 ---
 
-## Endpoints `/api/guias`
-
-| Método | Ruta | Acción | Códigos HTTP | Criterio |
-|---|---|---|---|---|
-| `POST` | `/api/guias` | Crea guía y sube PDF automáticamente a EFS → S3 | 201 + Location | C1, C2 |
-| `POST` | `/api/guias/{id}/s3` | Sube o re-sube la guía a S3 (misma key) | 200 + key | C2 |
-| `GET` | `/api/guias` | Historial filtrado (`?transportista=&fecha=`) | 200 lista JSON | C5 |
-| `GET` | `/api/guias/{id}` | Metadata de la guía | 200 / 404 | — |
-| `GET` | `/api/guias/{id}/s3` | Descarga PDF (requiere header `X-Transportista`) | 200 PDF / 403 / 404 | C4 |
-| `PUT` | `/api/guias/{id}` | Modifica datos, regenera PDF y sobrescribe misma key en S3 | 200 | C3 |
-| `DELETE` | `/api/guias/{id}` | Elimina de S3, EFS y base de datos | 204 / 404 | — |
-
-Swagger UI disponible en `http://<host>:8080/swagger-ui.html`.
-
----
-
-## Layout de key S3
+## Estructura del proyecto
 
 ```
-{yyyyMMdd}/{transportista}/guia{n}.pdf
-```
-
-Ejemplo:
-
-```
-20250315/transportistaX/guia42.pdf
+gestion-despacho/
+├── Dockerfile                 # Imagen multistage (build + runtime no-root)
+├── docker-compose.yml         # Despliegue en EC2 (bind EFS → /app/efs)
+├── .env.example               # Plantilla de variables de entorno
+├── pom.xml                    # Dependencias y build Maven
+├── .github/workflows/
+│   └── ci-cd.yml              # Pipeline: test (gate) + build & deploy
+└── src/
+    ├── main/java/cl/duoc/transportista/despacho/
+    │   ├── GestionDespachoApplication.java     # Entry point
+    │   ├── config/            # S3Config, OpenApiConfig, DataSeeder
+    │   ├── controller/        # GuiaController (API REST /api/guias)
+    │   ├── service/           # Lógica: guías, PDF, S3 y EFS
+    │   ├── repository/        # GuiaDespachoRepository (Spring Data JPA)
+    │   ├── model/             # GuiaDespacho (entidad)
+    │   ├── dto/               # GuiaRequest, GuiaResponse, ErrorResponse
+    │   └── exception/         # Manejo global de errores
+    ├── main/resources/
+    │   └── application.properties
+    └── test/java/...          # Tests de controller y servicios (JUnit)
 ```
 
 ---
 
-## Variables de entorno
+## Cómo ejecutar
 
-| Variable | Default | Descripción |
-|---|---|---|
-| `APP_EFS_DIR` | `/app/efs` | Ruta del directorio EFS dentro del contenedor |
-| `AWS_REGION` | `us-east-1` | Región AWS |
-| `AWS_S3_BUCKET` | *(requerido)* | Nombre del bucket S3 |
-| `AWS_ACCESS_KEY_ID` | *(vacío si LabRole)* | Access key (solo fallback sin rol de instancia) |
-| `AWS_SECRET_ACCESS_KEY` | *(vacío si LabRole)* | Secret key (solo fallback sin rol de instancia) |
-| `AWS_SESSION_TOKEN` | *(vacío si LabRole)* | Session token Learner Lab (solo fallback) |
-| `SPRING_DATASOURCE_URL` | `jdbc:h2:mem:guias;DB_CLOSE_DELAY=-1` | URL H2 (usar `jdbc:h2:file:./data/guias` para persistencia) |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `update` | DDL auto de Hibernate |
+El proyecto se compila **dentro de Docker**, así que no necesitas instalar Java ni Maven en tu máquina (y evita el problema de que un JDK reciente del host rompa Spring Boot 3).
 
----
-
-## Variables a setear en GitHub Actions (el colega)
-
-Dónde: en el repo → **Settings → Secrets and variables → Actions → New repository secret**. Crear estos (mismos nombres que en `.env.example`):
-
-| Secret | Ejemplo de valor | ¿Obligatorio? | De dónde sale |
-|---|---|---|---|
-| `DOCKERHUB_USERNAME` | `dalvaes` | sí | cuenta de Docker Hub |
-| `DOCKERHUB_TOKEN` | `dckr_pat_xxx` | sí | Docker Hub → Account settings → Personal access tokens (read/write) |
-| `EC2_HOST` | `34.205.57.70` | sí | IP elástica de la EC2 |
-| `USER_SERVER` | `ec2-user` | sí | usuario SSH de la instancia |
-| `EC2_SSH_KEY` | contenido del `.pem` (multilínea) | sí | par de claves creado con la EC2 |
-| `AWS_S3_BUCKET` | `gestion-despacho-bucket` | sí | bucket creado en el Lab |
-| `AWS_REGION` | `us-east-1` | sí | región del Lab |
-| `AWS_ACCESS_KEY_ID` | `ASIA...` | solo si NO hay LabRole | "AWS Details" del Learner Lab |
-| `AWS_SECRET_ACCESS_KEY` | `wJalr...` | solo si NO hay LabRole | "AWS Details" |
-| `AWS_SESSION_TOKEN` | `FwoGZ...` | solo si NO hay LabRole | "AWS Details" (caduca ~4h) |
-
-> Si la EC2 tiene el rol **LabRole / LabInstanceProfile**, las 3 credenciales `AWS_*` pueden omitirse (se resuelven solas por IMDS). `AWS_REGION` y `AWS_S3_BUCKET` siempre se necesitan.
-
-Atajo con GitHub CLI (parado en el repo):
-
-```bash
-gh secret set DOCKERHUB_USERNAME -b 'dalvaes'
-gh secret set DOCKERHUB_TOKEN    -b 'dckr_pat_xxx'
-gh secret set EC2_HOST           -b '34.205.57.70'
-gh secret set USER_SERVER        -b 'ec2-user'
-gh secret set EC2_SSH_KEY        < mi-clave.pem
-gh secret set AWS_S3_BUCKET      -b 'gestion-despacho-bucket'
-gh secret set AWS_REGION         -b 'us-east-1'
-# Solo si NO hay LabRole en la EC2:
-gh secret set AWS_ACCESS_KEY_ID     -b 'ASIA...'
-gh secret set AWS_SECRET_ACCESS_KEY -b 'wJalr...'
-gh secret set AWS_SESSION_TOKEN     -b 'FwoGZ...'
-```
-
-> Las credenciales del Learner Lab caducan (~4h) y cambian al reiniciar el Lab → actualizar las `AWS_*` y `EC2_HOST` antes de cada corrida del pipeline. Ver `.env.example` para copiarlas a un `.env` local.
-
----
-
-## Construcción en CI/CD (guía para el colega)
-
-La imagen se construye con el `Dockerfile` del repo. Es **multistage** y requiere **BuildKit** (por los `--mount=type=cache`). `docker/build-push-action` ya usa BuildKit por defecto; en build local hay que exportar `DOCKER_BUILDKIT=1`.
-
-Etapas del `Dockerfile`:
-1. `deps` (`maven:3.9-eclipse-temurin-17`): copia solo `pom.xml` y corre `dependency:go-offline` con cache de `~/.m2` → las dependencias se cachean y no se re-descargan si `pom.xml` no cambia.
-2. `build`: agrega `src/` y hace `mvn package -DskipTests` (reusa la cache de `~/.m2`).
-3. `extract` (`temurin:17-jdk-jammy`): `java -Djarmode=tools ... extract --layers` → separa el JAR en capas (dependencies / loader / snapshot / application).
-4. `runtime` (`temurin:17-jre-jammy`): copia las capas, instala `curl`, crea usuario **no-root** `app`, define `HEALTHCHECK` contra `/actuator/health` y arranca con flags de contenedor de la JVM.
-
-Ventaja para el pipeline: al cambiar solo código de la app, únicamente se re-pushea la capa `application` (~1-3 MB) en vez de ~80-120 MB de dependencias.
-
-### Workflow de GitHub Actions (a crear)
-
-- **Job `test`** (gate): `actions/setup-java@v4` con Java 17 → `mvn -B test` (o `./mvnw -B test`). Si falla, no despliega.
-- **Job `build-and-deploy`** (solo `push` a `main`):
-  1. `docker/login-action` con `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`.
-  2. `docker/build-push-action@v6` con `push: true`, tags `:latest` y `:${{ github.sha }}`, y cache `cache-from`/`cache-to: type=gha` para aprovechar la cache de dependencias entre runs.
-  3. Copiar `docker-compose.yml` a la EC2 (`scp`) y por `ssh` exportar las variables (`APP_IMAGE`, `AWS_REGION`, `AWS_S3_BUCKET`, `APP_EFS_DIR=/app/efs`, y las `AWS_*` solo si no se usa LabRole) y ejecutar `docker compose pull app && docker compose up -d`.
-- **Prerrequisito de infra:** EFS montado en `/mnt/efs` (NFS 2049, misma AZ), bucket S3 creado, EC2 con LabRole + puerto 8080, y los Secrets de la tabla anterior.
-
----
-
-## Montaje EFS en EC2
-
-Ejecutar una sola vez en la instancia antes de levantar el contenedor:
-
-```bash
-sudo mkdir -p /mnt/efs
-sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 \
-  <efs-dns>:/ /mnt/efs
-```
-
-Verificar que el mount está activo:
-
-```bash
-mountpoint -q /mnt/efs && echo "EFS montado" || echo "EFS NO montado"
-df -h /mnt/efs
-```
-
-El `docker-compose.yml` hace el bind al contenedor:
-
-```yaml
-volumes:
-  - /mnt/efs:/app/efs
-```
-
-Esto hace que `/app/efs` dentro del contenedor y `/mnt/efs` en el host sean el mismo directorio (criterio C1). Para verificar la identidad:
-
-```bash
-sudo touch /mnt/efs/_probe
-docker exec gestion-despacho ls -l /app/efs/_probe
-sudo rm /mnt/efs/_probe
-```
-
-Para que el mount persista tras reinicio, agregar a `/etc/fstab`:
-
-```
-<efs-dns>:/ /mnt/efs nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,_netdev 0 0
-```
-
-El Security Group del EFS debe permitir inbound TCP 2049 desde el SG de la EC2, en la misma AZ donde está el mount target.
-
----
-
-## Nota de seguridad de credenciales
-
-- **Nunca** hardcodear `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` ni `AWS_SESSION_TOKEN` en el codigo, en `application.properties` ni en `docker-compose.yml`.
-- El archivo `.env` (valores reales) esta en `.gitignore` y **no se versiona**.
-- En produccion (EC2 con LabRole) las credenciales AWS se resuelven automaticamente via IMDS; las variables `AWS_ACCESS_KEY_ID`/`SECRET`/`SESSION_TOKEN` pueden dejarse vacias.
-- Verificar ausencia de secretos antes de cada commit:
-  ```bash
-  git grep -nE "AKIA|aws_secret|SESSION_TOKEN|password=" -- ':!*.example' ':!README.md'
-  ```
-  El resultado debe estar vacio.
-
----
-
-## Build y tests en Docker JDK17
-
-El host puede tener JDK 26, que rompe Spring Boot 3. Compilar y testear siempre con:
+### 1. Tests
 
 ```bash
 docker run --rm \
-  -v "$PWD":/app \
-  -v "$HOME/.m2":/root/.m2 \
-  -w /app \
+  -v "$PWD":/app -v "$HOME/.m2":/root/.m2 -w /app \
   maven:3.9-eclipse-temurin-17 \
   mvn -B clean test
 ```
 
-Todos los tests deben pasar en verde antes de entregar al colega (el workflow del colega usa el mismo gate).
+Todos los tests deben pasar en verde.
 
-## Construir y correr la imagen localmente
+### 2. Construir y correr la imagen localmente
 
 La imagen se compila sola desde el `Dockerfile` (no hace falta empaquetar el JAR a mano). Requiere BuildKit:
 
@@ -204,4 +69,94 @@ DOCKER_BUILDKIT=1 docker build -t gestion-despacho:local .
 docker run --rm -p 8080:8080 gestion-despacho:local
 ```
 
-Luego: Swagger en `http://localhost:8080/swagger-ui.html` y health en `http://localhost:8080/actuator/health`. El seeder carga 3 guías de prueba (idempotente). Las operaciones contra S3 requieren AWS configurado; sin credenciales, crear/subir devuelve 5xx pero el PDF igual se escribe en el EFS configurado.
+### 3. Verificar
+
+- **Swagger UI:** http://localhost:8080/swagger-ui.html
+- **Health:** http://localhost:8080/actuator/health
+
+Al arrancar, el seeder carga 3 guías de prueba (idempotente). Las operaciones contra S3 requieren AWS configurado; sin credenciales el PDF igual se escribe en el EFS local, pero subir a S3 devuelve error.
+
+---
+
+## Variables de entorno
+
+Copiar `.env.example` a `.env` y completar (ver `docker-compose.yml`):
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `APP_EFS_DIR` | `/app/efs` | Directorio EFS dentro del contenedor |
+| `AWS_REGION` | `us-east-1` | Región AWS |
+| `AWS_S3_BUCKET` | *(requerido)* | Nombre del bucket S3 |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | *(vacío con LabRole)* | Credenciales Learner Lab; pueden omitirse si la EC2 usa LabRole (se resuelven vía IMDS) |
+| `SPRING_DATASOURCE_URL` | `jdbc:h2:mem:guias;DB_CLOSE_DELAY=-1` | URL H2 (usar `jdbc:h2:file:./data/guias` para persistencia) |
+| `AZURE_TENANT_ID` | *(requerido)* | Tenant Azure AD B2C, por ejemplo `miduocb2c.onmicrosoft.com` |
+| `AZURE_CLIENT_ID` | *(requerido)* | Application/API Client ID usado como audiencia del access token |
+| `AZURE_B2C_USER_FLOW` | `B2C_1_signupsignin` | User flow/policy usado para login y emisión de tokens |
+| `AZURE_JWK_SET_URI` | *(requerido)* | URL de llaves públicas B2C para validar la firma JWT |
+
+> Nunca se hardcodean credenciales AWS en el código ni en `docker-compose.yml`. El `.env` real está en `.gitignore` y no se versiona.
+
+### Seguridad JWT / Azure AD B2C
+
+La aplicación **no emite tokens**: funciona como **OAuth2 Resource Server**. Postman debe pedir el access token directamente a Azure AD B2C y luego enviarlo como `Authorization: Bearer <token>`.
+
+Claims aceptados para autorización:
+
+- `roles`: `DESCARGADOR` o `GESTOR`.
+- `extension_consultaRole`: también acepta `consulta`, `descarga`, `descargador`, `gestion`, `gestor` o `admin`.
+- `scp`: útil si Azure entrega permisos como scopes separados por espacio.
+
+Mapeo de permisos:
+
+| Rol/claim | Permisos |
+|---|---|
+| `DESCARGADOR` / `consulta` / `descarga` | Solo `GET /api/guias/{id}/s3` |
+| `GESTOR` / `gestion` / `admin` | Todos los endpoints `/api/guias/**`, incluida descarga |
+
+Configuración Postman recomendada para obtener token desde B2C:
+
+1. Crear/exponer una API en Azure AD B2C y definir un scope, por ejemplo `guia.readwrite`.
+2. Crear un App Registration para Postman y habilitar redirect URI `https://oauth.pstmn.io/v1/callback`.
+3. En Postman → Authorization → OAuth 2.0:
+   - Grant Type: `Authorization Code`.
+   - Auth URL: `https://<tenant>.b2clogin.com/<tenant>.onmicrosoft.com/<policy>/oauth2/v2.0/authorize`.
+   - Access Token URL: `https://<tenant>.b2clogin.com/<tenant>.onmicrosoft.com/<policy>/oauth2/v2.0/token`.
+   - Client ID/Secret: los del App Registration de Postman.
+   - Scope: `openid offline_access https://<tenant>.onmicrosoft.com/<api-client-id-or-app-id-uri>/guia.readwrite`.
+4. Verificar el token en `https://jwt.ms`: debe traer `aud` de la API y algún claim de rol (`roles`, `extension_consultaRole` o `scp`).
+
+Evidencias esperadas para la S6:
+
+- Sin token: `401 Unauthorized`.
+- Token válido sin rol suficiente: `403 Forbidden`.
+- Token con `DESCARGADOR`/`consulta`: descarga PDF `200 OK`, pero creación/edición `403`.
+- Token con `GESTOR`/`gestion`: creación/edición/descarga `200` o `201`.
+
+---
+
+## API REST `/api/guias`
+
+| Método | Ruta | Acción |
+|---|---|---|
+| `POST` | `/api/guias` | Crea la guía y sube el PDF a EFS → S3 (201 + Location) |
+| `POST` | `/api/guias/{id}/s3` | Sube o re-sube la guía a S3 (misma key) |
+| `GET` | `/api/guias` | Historial filtrable (`?transportista=&fecha=`) |
+| `GET` | `/api/guias/{id}` | Metadata de la guía |
+| `GET` | `/api/guias/{id}/s3` | Descarga el PDF (requiere header `X-Transportista`) |
+| `PUT` | `/api/guias/{id}` | Modifica datos, regenera el PDF y sobrescribe la key en S3 |
+| `DELETE` | `/api/guias/{id}` | Elimina de S3, EFS y base de datos |
+
+**Layout de la key en S3:** `{yyyyMMdd}/{transportista}/guia{n}.pdf` — por ejemplo `20250315/transportistaX/guia42.pdf`.
+
+---
+
+## Despliegue (CI/CD en EC2)
+
+El pipeline está en `.github/workflows/ci-cd.yml` y se dispara en cada `push`/`pull_request` a `main`:
+
+1. **`test`** — corre `./mvnw -B test` con Java 17. Si falla, no despliega.
+2. **`build-and-deploy`** (solo `push` a `main`) — construye la imagen con `docker/build-push-action`, la publica en Docker Hub (`:latest` y `:${sha}`), copia el `docker-compose.yml` a la EC2 por SSH y ejecuta `docker compose pull && up -d`.
+
+En la EC2, el EFS se monta una vez en `/mnt/efs` y el `docker-compose.yml` lo enlaza al contenedor (`/mnt/efs:/app/efs`), de modo que los PDF escritos por la app quedan en el almacenamiento compartido EFS antes de subirse a S3.
+
+Secrets requeridos en GitHub (*Settings → Secrets and variables → Actions*): `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`, `USER_SERVER`, `EC2_SSH_KEY`, `AWS_S3_BUCKET`, `AWS_REGION` y, solo si la EC2 no usa LabRole, `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`.

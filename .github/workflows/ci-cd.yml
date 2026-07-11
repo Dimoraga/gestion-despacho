@@ -85,7 +85,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
-            cat > ~/.env <<'EOF'
+            cat > ~/.env << EOF
             APP_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho:${{ github.sha }}
             CONSUMIDOR_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:${{ github.sha }}
             APP_EFS_DIR=/app/efs
@@ -94,6 +94,11 @@ jobs:
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
+            AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}
+            AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
+            AZURE_B2C_USER_FLOW=${{ secrets.AZURE_B2C_USER_FLOW }}
+            AZURE_ISSUER_URI=${{ secrets.AZURE_ISSUER_URI }}
+            AZURE_JWK_SET_URI=${{ secrets.AZURE_JWK_SET_URI }}
             EOF
             cd ~
             docker compose pull app consumidor

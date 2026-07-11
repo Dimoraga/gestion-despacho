@@ -3,27 +3,22 @@ services:
     image: ${APP_IMAGE:-dalvaes/gestion-despacho:latest}
     container_name: gestion-despacho
     ports: ["8080:8080"]
-    volumes:
-      - /mnt/efs:/app/efs
+    volumes: ["${HOST_EFS_DIR:-/mnt/efs}:/app/efs"]
     environment:
       APP_EFS_DIR: ${APP_EFS_DIR:-/app/efs}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-admin}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-admin123}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:h2:mem:guias;DB_CLOSE_DELAY=-1}
-      SPRING_DATASOURCE_DRIVER: ${SPRING_DATASOURCE_DRIVER:-org.h2.Driver}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-sa}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
-    restart: unless-stopped
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      AZURE_JWK_SET_URI: ${AZURE_JWK_SET_URI:-}
     depends_on:
-      - rabbitmq
-
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
   consumidor:
     image: ${CONSUMIDOR_IMAGE:-dalvaes/gestion-despacho-consumidor:latest}
     container_name: gestion-despacho-consumidor
@@ -34,27 +29,21 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-admin}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-admin123}
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:h2:mem:guias-registro;DB_CLOSE_DELAY=-1}
-      SPRING_DATASOURCE_DRIVER: ${SPRING_DATASOURCE_DRIVER:-org.h2.Driver}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-sa}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
-    restart: unless-stopped
     depends_on:
-      - rabbitmq
-
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+    ports: ["5672:5672", "15672:15672"]
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-admin123}
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    restart: unless-stopped
-
+    volumes: ["rabbitmq_data:/var/lib/rabbitmq"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 volumes:
   rabbitmq_data:
-

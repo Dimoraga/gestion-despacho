@@ -24,15 +24,15 @@ public class GuiaDespachoServiceImpl implements GuiaDespachoService {
     private final GuiaPdfService pdfService;
     private final S3StorageService s3;
     private final EfsStorageService efs;
-    private final GuiaQueuePublisher queuePublisher;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     public GuiaDespachoServiceImpl(GuiaDespachoRepository repo, GuiaPdfService pdfService,
-                                   S3StorageService s3, EfsStorageService efs, GuiaQueuePublisher queuePublisher) {
+                                   S3StorageService s3, EfsStorageService efs, org.springframework.context.ApplicationEventPublisher eventPublisher) {
         this.repo = repo;
         this.pdfService = pdfService;
         this.s3 = s3;
         this.efs = efs;
-        this.queuePublisher = queuePublisher;
+        this.eventPublisher = eventPublisher;
     }
 
     private String buildKey(GuiaDespacho g) {
@@ -59,8 +59,8 @@ public class GuiaDespachoServiceImpl implements GuiaDespachoService {
         repo.save(g);
         subirAS3(g.getNumeroGuia());
         GuiaResponse response = toResponse(buscar(g.getNumeroGuia()));
-        queuePublisher.publicarGuia(new GuiaColaMensaje(response.numeroGuia(), response.transportista(),
-                response.fecha(), response.destino(), response.pedido(), response.archivoKey()));
+        eventPublisher.publishEvent(new GuiaCreadaEvent(new GuiaColaMensaje(response.numeroGuia(), response.transportista(),
+                response.fecha(), response.destino(), response.pedido(), response.archivoKey())));
         return response;
     }
 

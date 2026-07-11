@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "guia_despacho_registro")
+@Table(name = "guia_despacho_registro", uniqueConstraints = @UniqueConstraint(name = "uk_registro_numero_guia", columnNames = "numero_guia"))
 @Getter
 @Setter
 @NoArgsConstructor

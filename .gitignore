@@ -32,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 .env
+.m2-local/
 *.pem
 /data/
 .omc/
+evidencias_s*/
+.slim/deepwork/

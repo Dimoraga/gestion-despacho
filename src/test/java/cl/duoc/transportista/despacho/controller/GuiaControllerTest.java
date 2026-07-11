@@ -99,7 +99,7 @@ class GuiaControllerTest {
                 """;
 
         mockMvc.perform(post("/api/guias")
-                        .with(descarga())
+                        .with(jwt().jwt(j -> j.claim("preferred_username", "transportistaX")).authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.DESCARGA_GUIAS)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isForbidden());
@@ -107,20 +107,21 @@ class GuiaControllerTest {
 
     @Test
     void descargarDeS3_transportistaAutorizado_retorna200() throws Exception {
-        when(service.descargarDeS3(1L, "transportistaX")).thenReturn(new byte[]{1});
+        when(service.descargarDeS3(eq(1L), eq("transportistaX"))).thenReturn(new byte[]{1});
 
         mockMvc.perform(get("/api/guias/1/s3")
-                        .with(descarga())
+                        .with(jwt().jwt(j -> j.claim("preferred_username", "transportistaX")).authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.DESCARGA_GUIAS)))
                         .header("X-Transportista", "transportistaX"))
                 .andExpect(status().isOk());
     }
 
     @Test
     void descargarDeS3_transportistaNoAutorizado_retorna403() throws Exception {
-        when(service.descargarDeS3(eq(1L), eq("otro"))).thenThrow(new AccesoDenegadoException("no"));
+        when(service.descargarDeS3(eq(1L), eq("otro")))
+                .thenThrow(new AccesoDenegadoException("no"));
 
         mockMvc.perform(get("/api/guias/1/s3")
-                        .with(descarga())
+                        .with(jwt().jwt(j -> j.claim("preferred_username", "otro")).authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.DESCARGA_GUIAS)))
                         .header("X-Transportista", "otro"))
                 .andExpect(status().isForbidden());
     }
