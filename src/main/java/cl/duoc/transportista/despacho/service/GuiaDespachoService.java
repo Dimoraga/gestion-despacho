@@ -7,17 +7,17 @@ import java.util.List;
 
 public interface GuiaDespachoService {
 
-    GuiaResponse crear(GuiaRequest request);
+  GuiaResponse crear(GuiaRequest request);
 
-    GuiaResponse obtener(Long numeroGuia);
+  GuiaResponse obtener(Long numeroGuia);
 
-    String subirAS3(Long numeroGuia);
+  String subirAS3(Long numeroGuia);
 
-    byte[] descargarDeS3(Long numeroGuia, String solicitante);
+  byte[] descargarDeS3(Long numeroGuia, String solicitante);
 
-    GuiaResponse actualizar(Long numeroGuia, GuiaRequest request);
+  GuiaResponse actualizar(Long numeroGuia, GuiaRequest request);
 
-    List<GuiaResponse> historial(String transportista, LocalDate fecha);
+  List<GuiaResponse> historial(String transportista, LocalDate fecha);
 
-    void eliminar(Long numeroGuia);
+  void eliminar(Long numeroGuia);
 }
