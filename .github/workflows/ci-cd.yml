@@ -36,6 +36,7 @@ jobs:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -68,23 +69,17 @@ jobs:
           cache-from: type=gha,scope=consumidor
           cache-to: type=gha,mode=max,scope=consumidor
 
-      - name: Copiar docker-compose.yml a la EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.USER_SERVER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: docker-compose.yml
-          target: ~/
-
       - name: Desplegar en la EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.USER_SERVER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 10m
           script: |
             set -e
+            curl -fsSL https://raw.githubusercontent.com/Dimoraga/gestion-despacho/${{ github.sha }}/docker-compose.yml -o ~/docker-compose.yml
             cat > ~/.env << EOF
             APP_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho:${{ github.sha }}
             CONSUMIDOR_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:${{ github.sha }}
