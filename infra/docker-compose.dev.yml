@@ -1,0 +1,7 @@
+services:
+  app:
+    build:
+      context: ../services/productor
+  consumidor:
+    build:
+      context: ../services/consumidor

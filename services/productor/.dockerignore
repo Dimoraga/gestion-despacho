@@ -1,0 +1,12 @@
+target/
+.git/
+.github/
+.gitignore
+.idea/
+*.iml
+.env
+.env.*
+*.log
+HELP.md
+.omc/
+evidencias_s*/

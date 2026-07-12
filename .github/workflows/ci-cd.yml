@@ -22,16 +22,18 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+          cache-dependency-path: |
+            services/productor/pom.xml
+            services/consumidor/pom.xml
 
       - name: Dar permiso de ejecución a mvnw
         run: chmod +x mvnw
 
       - name: Test productor
-        run: ./mvnw -B test
+        run: ./mvnw -B -f services/productor/pom.xml test
 
       - name: Test consumidor
-        working-directory: gestion-despacho-consumidor
-        run: mvn -B test
+        run: ./mvnw -B -f services/consumidor/pom.xml test
 
   build-and-deploy:
     needs: test
@@ -51,7 +53,7 @@ jobs:
       - name: Build y push productor
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./services/productor
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho:latest
@@ -62,7 +64,7 @@ jobs:
       - name: Build y push consumidor
         uses: docker/build-push-action@v6
         with:
-          context: ./gestion-despacho-consumidor
+          context: ./services/consumidor
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:latest
@@ -82,7 +84,7 @@ jobs:
             set -euo pipefail
             umask 077
             printf '%s\n' 'Descargando docker-compose.yml del commit de despliegue...'
-            curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-max-time 60 https://raw.githubusercontent.com/Dimoraga/gestion-despacho/${{ github.sha }}/docker-compose.yml -o ~/docker-compose.yml
+            curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-max-time 60 https://raw.githubusercontent.com/Dimoraga/gestion-despacho/${{ github.sha }}/infra/docker-compose.yml -o ~/docker-compose.yml
             if [ ! -s ~/docker-compose.yml ]; then
               printf '%s\n' 'Error: no se pudo obtener ~/docker-compose.yml.' >&2
               exit 1

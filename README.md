@@ -23,51 +23,58 @@ Sistema de Gestión de Pedidos y Generación de Guías de Despacho para una empr
 
 ```
 gestion-despacho/
-├── Dockerfile                 # Imagen multistage (build + runtime no-root)
-├── docker-compose.yml         # Despliegue en EC2 (bind EFS → /app/efs)
-├── .env.example               # Plantilla de variables de entorno
-├── pom.xml                    # Dependencias y build Maven
 ├── .github/workflows/
 │   └── ci-cd.yml              # Pipeline: test (gate) + build & deploy
-└── src/
-    ├── main/java/cl/duoc/transportista/despacho/
-    │   ├── GestionDespachoApplication.java     # Entry point
-    │   ├── config/            # S3Config, OpenApiConfig, DataSeeder
-    │   ├── controller/        # GuiaController (API REST /api/guias)
-    │   ├── service/           # Lógica: guías, PDF, S3 y EFS
-    │   ├── repository/        # GuiaDespachoRepository (Spring Data JPA)
-    │   ├── model/             # GuiaDespacho (entidad)
-    │   ├── dto/               # GuiaRequest, GuiaResponse, ErrorResponse
-    │   └── exception/         # Manejo global de errores
-    ├── main/resources/
-    │   └── application.properties
-    └── test/java/...          # Tests de controller y servicios (JUnit)
+├── .mvn/                       # Maven Wrapper compartido
+├── mvnw / mvnw.cmd
+├── services/
+│   ├── productor/              # API REST y publicador RabbitMQ
+│   │   ├── src/ pom.xml Dockerfile .dockerignore
+│   └── consumidor/             # Listener, H2/EFS, PDF y S3
+│       ├── src/ pom.xml Dockerfile .dockerignore
+├── infra/
+│   ├── docker-compose.yml      # Runtime en EC2: solo imágenes
+│   ├── docker-compose.dev.yml  # Overlay local: builds de ambos servicios
+│   └── .env.example            # Plantilla de variables de entorno
+└── docs/postman/
+    └── gestion-despacho.postman_collection.json
 ```
 
 ---
 
 ## Cómo ejecutar
 
-El proyecto se compila **dentro de Docker**, así que no necesitas instalar Java ni Maven en tu máquina (y evita el problema de que un JDK reciente del host rompa Spring Boot 3).
+El Maven Wrapper compartido permite ejecutar ambos servicios con Java 17 sin instalar Maven globalmente.
 
 ### 1. Tests
 
 ```bash
-docker run --rm \
-  -v "$PWD":/app -v "$HOME/.m2":/root/.m2 -w /app \
-  maven:3.9-eclipse-temurin-17 \
-  mvn -B clean test
+./mvnw -B -f services/productor/pom.xml test
+./mvnw -B -f services/consumidor/pom.xml test
 ```
 
 Todos los tests deben pasar en verde.
 
 ### 2. Construir y correr la imagen localmente
 
-La imagen se compila sola desde el `Dockerfile` (no hace falta empaquetar el JAR a mano). Requiere BuildKit:
+Las imágenes se compilan desde el contexto de cada servicio (no hace falta empaquetar el JAR a mano). Requiere BuildKit:
 
 ```bash
-DOCKER_BUILDKIT=1 docker build -t gestion-despacho:local .
-docker run --rm -p 8080:8080 gestion-despacho:local
+DOCKER_BUILDKIT=1 docker build -t gestion-despacho:local services/productor
+DOCKER_BUILDKIT=1 docker build -t gestion-despacho-consumidor:local services/consumidor
+```
+
+Para desarrollo local con ambos builds y RabbitMQ, copia `infra/.env.example` a
+`infra/.env` y ejecuta:
+
+```bash
+docker compose --env-file infra/.env -f infra/docker-compose.yml -f infra/docker-compose.dev.yml up --build
+```
+
+Para despliegue se usa solo el Compose de runtime (imágenes publicadas):
+
+```bash
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d
 ```
 
 ### 3. Verificar
@@ -81,7 +88,7 @@ Al arrancar, el seeder carga 3 guías de prueba (idempotente). Las operaciones c
 
 ## Variables de entorno
 
-Copiar `.env.example` a `.env` y completar (ver `docker-compose.yml`):
+Copiar `infra/.env.example` a `infra/.env` y completar (ver `infra/docker-compose.yml`):
 
 | Variable | Default | Descripción |
 |---|---|---|
@@ -101,7 +108,7 @@ Copiar `.env.example` a `.env` y completar (ver `docker-compose.yml`):
 | `AZURE_JWK_SET_URI` | *(requerido)* | URL de llaves públicas del tenant para validar la firma JWT |
 | `AZURE_ROLES_CLAIM` | `roles` | Claim JWT usado para roles |
 
-> Nunca se hardcodean credenciales AWS en el código ni en `docker-compose.yml`. El `.env` real está en `.gitignore` y no se versiona.
+> Nunca se hardcodean credenciales AWS en el código ni en `infra/docker-compose.yml`. El `.env` real está en `.gitignore` y no se versiona.
 
 ### Seguridad JWT / Microsoft Entra ID
 
@@ -167,9 +174,9 @@ Los errores terminales se envían a la DLQ de RabbitMQ mediante NACK sin requeue
 
 El pipeline está en `.github/workflows/ci-cd.yml` y se dispara en cada `push`/`pull_request` a `main`:
 
-1. **`test`** — corre `./mvnw -B test` con Java 17. Si falla, no despliega.
-2. **`build-and-deploy`** (solo `push` a `main`) — construye la imagen con `docker/build-push-action`, la publica en Docker Hub (`:latest` y `:${sha}`), se conecta por SSH y descarga el `docker-compose.yml` del commit con `curl` autenticado por la URL pública de GitHub; no usa SCP. Luego ejecuta `docker compose pull && up -d`.
+1. **`test`** — corre `./mvnw -B -f services/productor/pom.xml test` y `./mvnw -B -f services/consumidor/pom.xml test` con Java 17. Si falla, no despliega.
+2. **`build-and-deploy`** (solo `push` a `main`) — construye las imágenes desde `services/productor` y `services/consumidor`, las publica en Docker Hub (`:latest` y `:${sha}`), se conecta por SSH y descarga `infra/docker-compose.yml` del commit con `curl`; no usa SCP. Luego ejecuta `docker compose pull && up -d`.
 
-En la EC2, el EFS se monta una vez en `/mnt/efs`. El despliegue crea y valida el subdirectorio `HOST_EFS_DIR` (por defecto `/mnt/efs/gestion-despacho-consumidor`) con modo `2770` y propietario/grupo del usuario no-root del Consumidor. `docker-compose.yml` lo enlaza en `APP_EFS_DIR` (por defecto `/app/efs`) para Productor y Consumidor. Allí persisten los archivos H2 y los PDF del Consumidor antes de subirse a S3.
+En la EC2, el EFS se monta una vez en `/mnt/efs`. El despliegue crea y valida el subdirectorio `HOST_EFS_DIR` (por defecto `/mnt/efs/gestion-despacho-consumidor`) con modo `2770` y propietario/grupo del usuario no-root del Consumidor. `infra/docker-compose.yml` lo enlaza en `APP_EFS_DIR` (por defecto `/app/efs`) para Productor y Consumidor. Allí persisten los archivos H2 y los PDF del Consumidor antes de subirse a S3.
 
 Secrets requeridos en GitHub (*Settings → Secrets and variables → Actions*): `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`, `USER_SERVER`, `EC2_SSH_KEY`, `RABBITMQ_USER`, `RABBITMQ_PASS`, `AWS_S3_BUCKET`, `AWS_REGION`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_ISSUER_URI`, `AZURE_JWK_SET_URI` y `AZURE_ROLES_CLAIM`. Solo si la EC2 no usa LabRole: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y `AWS_SESSION_TOKEN`.
