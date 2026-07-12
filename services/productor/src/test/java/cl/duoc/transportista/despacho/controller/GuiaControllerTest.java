@@ -53,7 +53,10 @@ class GuiaControllerTest {
     mockMvc
         .perform(
             post("/api/guias")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS)))
+                .with(
+                    jwt()
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS)))
                 .header("Idempotency-Key", "1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(BODY))
@@ -68,7 +71,10 @@ class GuiaControllerTest {
     mockMvc
         .perform(
             post("/api/guias")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS)))
+                .with(
+                    jwt()
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS)))
                 .header("Idempotency-Key", "0")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(BODY))
@@ -82,7 +88,10 @@ class GuiaControllerTest {
     mockMvc
         .perform(
             get("/api/guias/1")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS))))
+                .with(
+                    jwt()
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS))))
         .andExpect(status().isNotFound());
   }
 }

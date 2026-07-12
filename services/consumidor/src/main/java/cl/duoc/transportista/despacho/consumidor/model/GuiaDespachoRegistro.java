@@ -31,8 +31,10 @@ public class GuiaDespachoRegistro {
   private String payloadHash;
   private Integer versionEvento;
   private boolean eliminada;
+
   @Enumerated(EnumType.STRING)
   private EstadoProcesamiento estado;
+
   private Instant fechaInicioProcesamiento;
   private Instant fechaProcesado;
 }

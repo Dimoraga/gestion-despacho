@@ -30,10 +30,10 @@ jobs:
         run: chmod +x mvnw
 
       - name: Test productor
-        run: ./mvnw -B -f services/productor/pom.xml test
+        run: ./mvnw -B -f services/productor/pom.xml spotless:check test
 
       - name: Test consumidor
-        run: ./mvnw -B -f services/consumidor/pom.xml test
+        run: ./mvnw -B -f services/consumidor/pom.xml spotless:check test
 
   build-and-deploy:
     needs: test

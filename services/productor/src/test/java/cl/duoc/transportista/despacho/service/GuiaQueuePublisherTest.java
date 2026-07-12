@@ -60,7 +60,8 @@ class GuiaQueuePublisherTest {
 
     publisher.publicarGuia(mensaje);
 
-    ArgumentCaptor<MessagePostProcessor> processor = ArgumentCaptor.forClass(MessagePostProcessor.class);
+    ArgumentCaptor<MessagePostProcessor> processor =
+        ArgumentCaptor.forClass(MessagePostProcessor.class);
     verify(rabbitTemplate)
         .convertAndSend(
             eq("guias.exchange"),
@@ -68,8 +69,10 @@ class GuiaQueuePublisherTest {
             eq(mensaje),
             processor.capture(),
             any(CorrelationData.class));
-    Message published = processor.getValue().postProcessMessage(new Message(new byte[0], new MessageProperties()));
-    assertEquals(MessageDeliveryMode.PERSISTENT, published.getMessageProperties().getDeliveryMode());
+    Message published =
+        processor.getValue().postProcessMessage(new Message(new byte[0], new MessageProperties()));
+    assertEquals(
+        MessageDeliveryMode.PERSISTENT, published.getMessageProperties().getDeliveryMode());
     assertEquals("1", published.getMessageProperties().getMessageId());
     assertEquals(
         GuiaColaMensaje.CONTRACT_VERSION,
@@ -98,12 +101,6 @@ class GuiaQueuePublisherTest {
         IllegalArgumentException.class,
         () ->
             new GuiaColaMensaje(
-                2,
-                1L,
-                "transportistaX",
-                LocalDate.of(2021, 3, 15),
-                "Santiago",
-                "PED-001",
-                null));
+                2, 1L, "transportistaX", LocalDate.of(2021, 3, 15), "Santiago", "PED-001", null));
   }
 }

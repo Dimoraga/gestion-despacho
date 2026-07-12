@@ -25,18 +25,20 @@ public class GuiaController {
 
   @PostMapping
   public ResponseEntity<GuiaResponse> crear(
-      @RequestHeader("Idempotency-Key") String idempotencyKey, @Valid @RequestBody GuiaRequest req) {
+      @RequestHeader("Idempotency-Key") String idempotencyKey,
+      @Valid @RequestBody GuiaRequest req) {
     long numeroGuia;
     try {
       numeroGuia = Long.parseLong(idempotencyKey);
     } catch (NumberFormatException ex) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key debe ser un entero positivo");
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "Idempotency-Key debe ser un entero positivo");
     }
     if (numeroGuia <= 0) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key debe ser un entero positivo");
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "Idempotency-Key debe ser un entero positivo");
     }
     GuiaResponse r = service.crear(req, numeroGuia);
     return ResponseEntity.accepted().location(URI.create("/api/guias/" + r.numeroGuia())).body(r);
   }
-
 }
