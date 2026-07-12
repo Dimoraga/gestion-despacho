@@ -22,7 +22,7 @@
   },
   "item": [
     {
-      "name": "Crear guía asíncrona (202)",
+      "name": "POST /api/guias — Crear guía (202)",
       "request": {
         "method": "POST",
         "header": [
@@ -41,15 +41,15 @@
       }]
     },
     {
-      "name": "Consultar guía (404/202/200 durante procesamiento)",
+      "name": "GET /api/guias/{id} — Consultar guía",
       "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/guias/{{numeroGuia}}" }
     },
     {
-      "name": "Listar guías",
+      "name": "GET /api/guias — Listar guías",
       "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/guias" }
     },
     {
-      "name": "Actualizar guía completada",
+      "name": "PUT /api/guias/{id} — Actualizar guía",
       "request": {
         "method": "PUT",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -61,19 +61,19 @@
       }
     },
     {
-      "name": "Descargar PDF S3 (GUIAS_DESCARGA)",
+      "name": "GET /api/guias/{id}/s3 — Descargar PDF",
       "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/guias/{{numeroGuia}}/s3" }
     },
     {
-      "name": "Re-subir a S3",
+      "name": "POST /api/guias/{id}/s3 — Re-subir a S3",
       "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/api/guias/{{numeroGuia}}/s3" }
     },
     {
-      "name": "Eliminar guía completada",
+      "name": "DELETE /api/guias/{id} — Eliminar guía",
       "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/api/guias/{{numeroGuia}}" }
     },
     {
-      "name": "Sin token (debe dar 401)",
+      "name": "GET /api/guias — Sin token (401)",
       "request": {
         "auth": { "type": "noauth" },
         "method": "GET",
