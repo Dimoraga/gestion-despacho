@@ -5,13 +5,14 @@ import cl.duoc.transportista.despacho.dto.GuiaResponse;
 import cl.duoc.transportista.despacho.service.GuiaDespachoService;
 import jakarta.validation.Valid;
 import java.net.URI;
-import java.time.LocalDate;
-import java.util.List;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.*;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/guias")
@@ -23,52 +24,19 @@ public class GuiaController {
   }
 
   @PostMapping
-  public ResponseEntity<GuiaResponse> crear(@Valid @RequestBody GuiaRequest req) {
-    GuiaResponse r = service.crear(req);
-    return ResponseEntity.created(URI.create("/api/guias/" + r.numeroGuia())).body(r);
+  public ResponseEntity<GuiaResponse> crear(
+      @RequestHeader("Idempotency-Key") String idempotencyKey, @Valid @RequestBody GuiaRequest req) {
+    long numeroGuia;
+    try {
+      numeroGuia = Long.parseLong(idempotencyKey);
+    } catch (NumberFormatException ex) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key debe ser un entero positivo");
+    }
+    if (numeroGuia <= 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key debe ser un entero positivo");
+    }
+    GuiaResponse r = service.crear(req, numeroGuia);
+    return ResponseEntity.accepted().location(URI.create("/api/guias/" + r.numeroGuia())).body(r);
   }
 
-  @PostMapping("/{id}/s3")
-  public ResponseEntity<GuiaResponse> subirAS3(@PathVariable Long id) {
-    service.subirAS3(id);
-    return ResponseEntity.ok(service.obtener(id));
-  }
-
-  @GetMapping
-  public ResponseEntity<List<GuiaResponse>> historial(
-      @RequestParam(required = false) String transportista,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate fecha) {
-    return ResponseEntity.ok(service.historial(transportista, fecha));
-  }
-
-  @GetMapping("/{id}")
-  public ResponseEntity<GuiaResponse> obtener(@PathVariable Long id) {
-    return ResponseEntity.ok(service.obtener(id));
-  }
-
-  @GetMapping("/{id}/s3")
-  public ResponseEntity<byte[]> descargarDeS3(
-      @PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
-    String solicitante = jwt.getClaimAsString("preferred_username");
-    if (solicitante == null || solicitante.isBlank()) solicitante = jwt.getClaimAsString("name");
-    if (solicitante == null || solicitante.isBlank())
-      solicitante = service.obtener(id).transportista();
-    return ResponseEntity.ok()
-        .contentType(MediaType.APPLICATION_PDF)
-        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=guia" + id + ".pdf")
-        .body(service.descargarDeS3(id, solicitante));
-  }
-
-  @PutMapping("/{id}")
-  public ResponseEntity<GuiaResponse> actualizar(
-      @PathVariable Long id, @Valid @RequestBody GuiaRequest req) {
-    return ResponseEntity.ok(service.actualizar(id, req));
-  }
-
-  @DeleteMapping("/{id}")
-  public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-    service.eliminar(id);
-    return ResponseEntity.noContent().build();
-  }
 }

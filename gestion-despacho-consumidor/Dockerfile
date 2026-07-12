@@ -19,7 +19,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system app \
-    && useradd --system --gid app --home-dir /application --shell /usr/sbin/nologin app
+    && useradd --system --gid app --home-dir /application --shell /usr/sbin/nologin app \
+    && mkdir -p /app/efs \
+    && chown app:app /app/efs
 WORKDIR /application
 COPY --from=extract /builder/extracted/dependencies/ ./
 COPY --from=extract /builder/extracted/spring-boot-loader/ ./

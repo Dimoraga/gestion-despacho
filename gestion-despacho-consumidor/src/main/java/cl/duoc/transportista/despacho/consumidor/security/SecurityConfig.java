@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -47,6 +48,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/h2-console/**")
                     .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/guias/*/s3")
+                    .hasAuthority("ROLE_" + SecurityRoles.DESCARGA_GUIAS)
                     .anyRequest()
                     .hasAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS))
         .oauth2ResourceServer(

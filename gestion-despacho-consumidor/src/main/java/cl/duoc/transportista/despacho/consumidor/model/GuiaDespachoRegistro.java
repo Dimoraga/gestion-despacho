@@ -27,5 +27,12 @@ public class GuiaDespachoRegistro {
   private String destino;
   private String pedido;
   private String archivoKey;
+  private String efsPath;
+  private String payloadHash;
+  private Integer versionEvento;
+  private boolean eliminada;
+  @Enumerated(EnumType.STRING)
+  private EstadoProcesamiento estado;
+  private Instant fechaInicioProcesamiento;
   private Instant fechaProcesado;
 }

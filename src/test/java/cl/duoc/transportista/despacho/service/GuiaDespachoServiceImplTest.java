@@ -1,90 +1,38 @@
 package cl.duoc.transportista.despacho.service;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.verify;
 
+import cl.duoc.transportista.despacho.dto.GuiaColaMensaje;
+import cl.duoc.transportista.despacho.dto.GuiaRequest;
 import cl.duoc.transportista.despacho.dto.GuiaResponse;
-import cl.duoc.transportista.despacho.exception.AccesoDenegadoException;
-import cl.duoc.transportista.despacho.model.GuiaDespacho;
-import cl.duoc.transportista.despacho.repository.GuiaDespachoRepository;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class GuiaDespachoServiceImplTest {
 
-  @Mock GuiaDespachoRepository repo;
-
-  @Mock GuiaPdfService pdfService;
-
-  @Mock S3StorageService s3;
-
-  @Mock org.springframework.context.ApplicationEventPublisher eventPublisher;
-
-  @TempDir Path tmpEfs;
-
-  EfsStorageService efs;
-  GuiaDespachoServiceImpl service;
-  GuiaDespacho guia;
-
-  @BeforeEach
-  void setUp() {
-    efs = new EfsStorageService();
-    ReflectionTestUtils.setField(efs, "efsDir", tmpEfs.toString());
-    service = new GuiaDespachoServiceImpl(repo, pdfService, s3, efs, eventPublisher);
-
-    guia = new GuiaDespacho();
-    guia.setNumeroGuia(123L);
-    guia.setTransportista("transportistaX");
-    guia.setFecha(LocalDate.of(2021, 3, 15));
-    guia.setDestino("Santiago");
-    guia.setPedido("P-001");
-  }
+  @Mock GuiaQueuePublisher queuePublisher;
 
   @Test
-  void subirAS3_guardaEnEfsYSubeAS3YDevuelveKey() throws Exception {
-    when(repo.findById(123L)).thenReturn(Optional.of(guia));
-    when(pdfService.generar(guia)).thenReturn(new byte[] {1, 2, 3});
-    when(repo.save(any(GuiaDespacho.class))).thenReturn(guia);
+  void crear_publicaEventoVersionadoYNoGeneraArchivos() {
+    GuiaDespachoServiceImpl service = new GuiaDespachoServiceImpl(queuePublisher);
+    GuiaRequest request =
+        new GuiaRequest("transportistaX", LocalDate.of(2021, 3, 15), "Santiago", "P-001");
 
-    String key = service.subirAS3(123L);
+    GuiaResponse response = service.crear(request, 99L);
 
-    assertEquals("20210315/transportistaX/guia123.pdf", key);
-    assertTrue(Files.exists(tmpEfs.resolve(key)));
-    verify(s3).subir(eq(key), any(byte[].class), eq("application/pdf"));
-  }
-
-  @Test
-  void descargarDeS3_transportistaAjeno_lanzaAccesoDenegadoException() {
-    guia.setArchivoKey("20210315/transportistaX/guia123.pdf");
-    when(repo.findById(123L)).thenReturn(Optional.of(guia));
-
-    assertThrows(
-        AccesoDenegadoException.class, () -> service.descargarDeS3(123L, "otroTransportista"));
-  }
-
-  @Test
-  void historial_ambosFiltros_usaFindByTransportistaAndFechaYDevuelveUno() {
-    LocalDate fecha = LocalDate.of(2021, 3, 15);
-    when(repo.findByTransportistaAndFecha("transportistaX", fecha)).thenReturn(List.of(guia));
-
-    List<GuiaResponse> resultado = service.historial("transportistaX", fecha);
-
-    assertEquals(1, resultado.size());
-    verify(repo).findByTransportistaAndFecha("transportistaX", fecha);
-    verify(repo, never()).findByTransportista(any());
-    verify(repo, never()).findByFecha(any());
+    ArgumentCaptor<GuiaColaMensaje> event = ArgumentCaptor.forClass(GuiaColaMensaje.class);
+    verify(queuePublisher).publicarGuia(event.capture());
+    assertEquals(GuiaColaMensaje.CONTRACT_VERSION, event.getValue().version());
+    assertEquals(99L, event.getValue().numeroGuia());
+    assertNull(event.getValue().archivoKey());
+    assertEquals(99L, response.numeroGuia());
+    assertNull(response.archivoKey());
   }
 }

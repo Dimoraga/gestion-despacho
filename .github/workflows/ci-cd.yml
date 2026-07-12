@@ -92,7 +92,8 @@ jobs:
             APP_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho:${{ github.sha }}
             CONSUMIDOR_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:${{ github.sha }}
             APP_EFS_DIR=/app/efs
-            HOST_EFS_DIR=/mnt/efs
+            HOST_EFS_DIR=/mnt/efs/gestion-despacho-consumidor
+            CONSUMIDOR_SPRING_DATASOURCE_URL=jdbc:h2:file:/app/efs/h2/guias-registro;DB_CLOSE_DELAY=-1
             AWS_REGION=${{ secrets.AWS_REGION }}
             AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -107,13 +108,10 @@ jobs:
             AZURE_ROLES_CLAIM=${{ secrets.AZURE_ROLES_CLAIM || 'roles' }}
             EOF
             cd ~
-            HOST_EFS_DIR=/mnt/efs
-            if ! mountpoint -q "$HOST_EFS_DIR"; then
-              printf '%s\n' "Error: $HOST_EFS_DIR no es un punto de montaje EFS disponible." >&2
-              exit 1
-            fi
-            if ! touch "$HOST_EFS_DIR/.gestion-despacho-write-check-$$" || ! rm -f "$HOST_EFS_DIR/.gestion-despacho-write-check-$$"; then
-              printf '%s\n' "Error: $HOST_EFS_DIR no permite escritura para el despliegue." >&2
+            EFS_MOUNT=/mnt/efs
+            EFS_CONSUMIDOR_DIR="$EFS_MOUNT/gestion-despacho-consumidor"
+            if ! mountpoint -q "$EFS_MOUNT"; then
+              printf '%s\n' "Error: $EFS_MOUNT no es un punto de montaje EFS disponible." >&2
               exit 1
             fi
             printf '%s\n' 'Validando configuración de Docker Compose...'
@@ -125,13 +123,40 @@ jobs:
               docker compose pull app consumidor rabbitmq
             fi
             printf '%s\n' 'Descarga de imágenes Docker finalizada.'
-            printf '%s\n' 'Iniciando actualización de servicios Docker...'
-            if command -v timeout >/dev/null 2>&1; then
-              timeout 5m docker compose up -d
-            else
-              docker compose up -d
+            if ! CONSUMIDOR_UID="$(docker run --rm --entrypoint id "${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:${{ github.sha }}" -u app)" || ! CONSUMIDOR_GID="$(docker run --rm --entrypoint id "${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:${{ github.sha }}" -g app)"; then
+              printf '%s\n' 'Error: no se pudo obtener el UID/GID no-root del contenedor consumidor.' >&2
+              exit 1
             fi
-            printf '%s\n' 'Actualización de servicios Docker finalizada.'
+            if ! sudo -n true; then
+              printf '%s\n' 'Error: el usuario de despliegue necesita sudo sin contraseña para preparar permisos EFS.' >&2
+              exit 1
+            fi
+            if ! sudo -n install -d -m 2770 "$EFS_CONSUMIDOR_DIR" || ! sudo -n chown "$CONSUMIDOR_UID:$CONSUMIDOR_GID" "$EFS_CONSUMIDOR_DIR"; then
+              printf '%s\n' 'Error: no se pudieron preparar permisos EFS para el UID/GID no-root del consumidor.' >&2
+              exit 1
+            fi
+            if ! docker run --rm --user "$CONSUMIDOR_UID:$CONSUMIDOR_GID" -v "$EFS_CONSUMIDOR_DIR:/app/efs" --entrypoint sh "${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:${{ github.sha }}" -c 'touch /app/efs/.write-check && rm -f /app/efs/.write-check'; then
+              printf '%s\n' 'Error: el usuario no-root del consumidor no puede escribir en el subdirectorio EFS.' >&2
+              exit 1
+            fi
+            printf '%s\n' 'Iniciando actualización de servicios Docker...'
+            diagnostico_compose() {
+              printf '%s\n' 'Diagnóstico de Docker Compose tras fallo de disponibilidad:' >&2
+              docker compose ps || true
+              docker compose logs --tail=200 || true
+            }
+            if command -v timeout >/dev/null 2>&1; then
+              if ! timeout 5m docker compose up -d --wait --wait-timeout 180; then
+                diagnostico_compose
+                exit 1
+              fi
+            else
+              if ! docker compose up -d --wait --wait-timeout 180; then
+                diagnostico_compose
+                exit 1
+              fi
+            fi
+            printf '%s\n' 'Servicios Docker iniciados y saludables.'
             docker compose ps
             if command -v timeout >/dev/null 2>&1; then
               timeout 1m docker image prune -f

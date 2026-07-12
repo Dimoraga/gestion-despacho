@@ -8,12 +8,12 @@ Sistema de Gestión de Pedidos y Generación de Guías de Despacho para una empr
 |---|---|
 | Spring Boot | 3.5.x |
 | Java | 17 (Temurin) |
-| Base de datos | H2 embebido |
+| Base de datos | H2 embebido persistido en EFS por el Consumidor |
 | AWS SDK | v2 (`software.amazon.awssdk:s3`) |
 | Generación PDF | OpenPDF (`com.github.librepdf:openpdf`) |
 | Documentación API | springdoc-openapi (Swagger UI) |
 | Health / métricas | spring-boot-starter-actuator (`/actuator/health`) |
-| Mensajería | RabbitMQ: POST `/api/guias` publica tras commit; consumidor procesa `/api/guias/cola/procesar` |
+| Mensajería | RabbitMQ: POST `/api/guias` publica un evento; el listener automático del consumidor lo procesa |
 | Seguridad | Spring Security OAuth2 Resource Server JWT + Microsoft Entra ID |
 | Empaquetado | Docker multistage (`maven:3.9-eclipse-temurin-17` → `eclipse-temurin:17-jre-jammy`, usuario no-root) |
 
@@ -85,11 +85,13 @@ Copiar `.env.example` a `.env` y completar (ver `docker-compose.yml`):
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `APP_EFS_DIR` | `/app/efs` | Directorio EFS dentro del contenedor |
+| `HOST_EFS_DIR` | `/mnt/efs/gestion-despacho-consumidor` | Subdirectorio del EFS montado en EC2 y compartido con ambos contenedores |
+| `APP_EFS_DIR` | `/app/efs` | Directorio EFS dentro de los contenedores productor y consumidor |
 | `AWS_REGION` | `us-east-1` | Región AWS |
 | `AWS_S3_BUCKET` | *(requerido)* | Nombre del bucket S3 |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | *(vacío con LabRole)* | Credenciales Learner Lab; pueden omitirse si la EC2 usa LabRole (se resuelven vía IMDS) |
-| `SPRING_DATASOURCE_URL` | `jdbc:h2:mem:guias;DB_CLOSE_DELAY=-1` | URL H2 (usar `jdbc:h2:file:./data/guias` para persistencia) |
+| `SPRING_DATASOURCE_URL` | `jdbc:h2:mem:guias;DB_CLOSE_DELAY=-1` | URL H2 del Productor |
+| `CONSUMIDOR_SPRING_DATASOURCE_URL` | `jdbc:h2:file:/app/efs/h2/guias-registro;DB_CLOSE_DELAY=-1` | H2 durable del Consumidor, almacenada en EFS |
 | `SPRING_DATASOURCE_DRIVER` / `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | H2 / `sa` / vacío | Driver y credenciales de base de datos |
 | `SPRING_PROFILES_ACTIVE` | *(vacío)* | Perfil activo de Spring |
 | `RABBITMQ_USER` / `RABBITMQ_PASS` | *(requeridos)* | Credenciales del broker interno; generar una contraseña con `openssl rand -base64 32` |
@@ -107,16 +109,14 @@ La aplicación **no emite tokens**: funciona como **OAuth2 Resource Server**. Po
 
 Claims aceptados para autorización:
 
-- `roles`: `DESCARGADOR` o `GESTOR`.
-- `extension_consultaRole`: también acepta `consulta`, `descarga`, `descargador`, `gestion`, `gestor` o `admin`.
-- `scp`: útil si Azure entrega permisos como scopes separados por espacio.
+- `roles`: `GUIAS_DESCARGA` o `GUIAS_GESTION`.
 
 Mapeo de permisos:
 
 | Rol/claim | Permisos |
 |---|---|
-| `DESCARGADOR` / `consulta` / `descarga` | Solo `GET /api/guias/{id}/s3` |
-| `GESTOR` / `gestion` / `admin` | Todos los endpoints `/api/guias/**`, incluida descarga |
+| `GUIAS_DESCARGA` | Solo `GET /api/guias/{id}/s3`, sujeto a la identidad y claim de transportista del JWT |
+| `GUIAS_GESTION` | Endpoints de gestión de `/api/guias/**`; no autoriza `GET /api/guias/{id}/s3` |
 
 Configuración Postman recomendada para obtener token desde Microsoft Entra ID:
 
@@ -128,14 +128,14 @@ Configuración Postman recomendada para obtener token desde Microsoft Entra ID:
    - Access Token URL: `https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/token`.
    - Client ID/Secret: los del App Registration de Postman.
    - Scope: `openid offline_access api://{api-client-id}/guia.readwrite`.
-4. Verificar el token en `https://jwt.ms`: debe traer `aud` de la API y algún claim de rol (`roles`, `extension_consultaRole` o `scp`).
+4. Verificar el token en `https://jwt.ms`: debe traer el `aud` de la API y el claim `roles` con `GUIAS_GESTION` o `GUIAS_DESCARGA`.
 
 Evidencias esperadas para la S6:
 
 - Sin token: `401 Unauthorized`.
 - Token válido sin rol suficiente: `403 Forbidden`.
-- Token con `DESCARGADOR`/`consulta`: descarga PDF `200 OK`, pero creación/edición `403`.
-- Token con `GESTOR`/`gestion`: creación/edición/descarga `200` o `201`.
+- Token con `GUIAS_DESCARGA` cuya identidad/claim de transportista coincida con la guía: descarga PDF `200 OK`; sin coincidencia, `403 Forbidden`.
+- Token con `GUIAS_GESTION`: creación devuelve `202 Accepted` y habilita operaciones de gestión, pero no la descarga S3.
 
 ---
 
@@ -143,15 +143,23 @@ Evidencias esperadas para la S6:
 
 | Método | Ruta | Acción |
 |---|---|---|
-| `POST` | `/api/guias` | Crea la guía, sube PDF a EFS → S3 y publica RabbitMQ tras commit (201 + Location) |
+| `POST` | `/api/guias` | Valida y publica el evento en RabbitMQ (202 + `Location`); requiere `Idempotency-Key` entero positivo |
 | `POST` | `/api/guias/{id}/s3` | Sube o re-sube la guía a S3 (misma key) |
 | `GET` | `/api/guias` | Historial filtrable (`?transportista=&fecha=`) |
 | `GET` | `/api/guias/{id}` | Metadata de la guía |
-| `GET` | `/api/guias/{id}/s3` | Descarga el PDF (requiere header `X-Transportista`) |
+| `GET` | `/api/guias/{id}/s3` | Descarga el PDF: requiere `GUIAS_DESCARGA` y que la identidad/claim de transportista del JWT coincida con la guía |
 | `PUT` | `/api/guias/{id}` | Modifica datos, regenera el PDF y sobrescribe la key en S3 |
 | `DELETE` | `/api/guias/{id}` | Elimina de S3, EFS y base de datos |
 
 **Layout de la key en S3:** `{yyyyMMdd}/{transportista}/guia{n}.pdf` — por ejemplo `20250315/transportistaX/guia42.pdf`.
+
+### Flujo asíncrono
+
+El flujo de creación es **Productor → RabbitMQ → Listener del Consumidor → BD/EFS/S3**. El Productor no persiste ni genera archivos: tras confirmar la publicación persistente responde `202 Accepted`. El cliente debe enviar `Idempotency-Key` como entero positivo; ese valor identifica la guía y permite reintentos seguros.
+
+El Consumidor recibe el evento mediante listener automático, procesa de forma idempotente, persiste la guía y su H2 durable en el EFS compartido, genera el PDF en ese EFS y lo sube a S3. Las rutas existentes de consulta, modificación, eliminación y S3 son atendidas por el Consumidor una vez terminado el procesamiento. Durante la consistencia eventual, una guía todavía no creada puede responder `404`; en estados `PENDING`/`PROCESSING`, las consultas y operaciones S3 devuelven `202` y las modificaciones o eliminaciones `409`.
+
+Los errores terminales se envían a la DLQ de RabbitMQ mediante NACK sin requeue. Los errores transitorios de red o S3 se reintentan antes de enviarlos a la DLQ. RabbitMQ usa `restart: unless-stopped` para volver a iniciar tras reinicios de EC2 y evitar indisponibilidad del Gateway.
 
 ---
 
@@ -160,8 +168,8 @@ Evidencias esperadas para la S6:
 El pipeline está en `.github/workflows/ci-cd.yml` y se dispara en cada `push`/`pull_request` a `main`:
 
 1. **`test`** — corre `./mvnw -B test` con Java 17. Si falla, no despliega.
-2. **`build-and-deploy`** (solo `push` a `main`) — construye la imagen con `docker/build-push-action`, la publica en Docker Hub (`:latest` y `:${sha}`), copia el `docker-compose.yml` a la EC2 por SSH y ejecuta `docker compose pull && up -d`.
+2. **`build-and-deploy`** (solo `push` a `main`) — construye la imagen con `docker/build-push-action`, la publica en Docker Hub (`:latest` y `:${sha}`), se conecta por SSH y descarga el `docker-compose.yml` del commit con `curl` autenticado por la URL pública de GitHub; no usa SCP. Luego ejecuta `docker compose pull && up -d`.
 
-En la EC2, el EFS se monta una vez en `/mnt/efs` y el `docker-compose.yml` lo enlaza al contenedor (`/mnt/efs:/app/efs`), de modo que los PDF escritos por la app quedan en el almacenamiento compartido EFS antes de subirse a S3.
+En la EC2, el EFS se monta una vez en `/mnt/efs`. El despliegue crea y valida el subdirectorio `HOST_EFS_DIR` (por defecto `/mnt/efs/gestion-despacho-consumidor`) con modo `2770` y propietario/grupo del usuario no-root del Consumidor. `docker-compose.yml` lo enlaza en `APP_EFS_DIR` (por defecto `/app/efs`) para Productor y Consumidor. Allí persisten los archivos H2 y los PDF del Consumidor antes de subirse a S3.
 
 Secrets requeridos en GitHub (*Settings → Secrets and variables → Actions*): `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`, `USER_SERVER`, `EC2_SSH_KEY`, `RABBITMQ_USER`, `RABBITMQ_PASS`, `AWS_S3_BUCKET`, `AWS_REGION`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_ISSUER_URI`, `AZURE_JWK_SET_URI` y `AZURE_ROLES_CLAIM`. Solo si la EC2 no usa LabRole: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y `AWS_SESSION_TOKEN`.
