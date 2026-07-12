@@ -1,0 +1,85 @@
+{
+  "info": {
+    "name": "Gestión de Despacho - API Gateway",
+    "description": "Importa esta colección en Postman. Primero configura el token OAuth2 de Entra ID y guarda el access token en la variable accessToken. POST /api/guias es asíncrono: responde 202 y el consumidor crea PDF, BD y S3 mediante RabbitMQ.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://lbk8i1q0ri.execute-api.us-west-2.amazonaws.com" },
+    { "key": "accessToken", "value": "" },
+    { "key": "numeroGuia", "value": "1001" },
+    { "key": "idempotencyKey", "value": "1001" },
+    { "key": "tenantId", "value": "2093b05a-0a2b-4071-80f3-09def8556202" },
+    { "key": "apiAppId", "value": "bb4d3aae-c53d-4b3d-b5b8-db68447ebedc" },
+    { "key": "postmanClientId", "value": "379ebf0c-4905-49e7-bdd2-1abc5deca729" },
+    { "key": "scope", "value": "api://bb4d3aae-c53d-4b3d-b5b8-db68447ebedc/access_as_user" },
+    { "key": "authUrl", "value": "https://login.microsoftonline.com/{{tenantId}}/oauth2/v2.0/authorize" },
+    { "key": "tokenUrl", "value": "https://login.microsoftonline.com/{{tenantId}}/oauth2/v2.0/token" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Crear guía asíncrona (202)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"transportista\": \"diego.alvarez.e@ug.uchile.cl\",\n  \"fecha\": \"2026-07-12\",\n  \"destino\": \"Santiago\",\n  \"pedido\": \"PED-1001\"\n}"
+        },
+        "url": "{{baseUrl}}/api/guias"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": ["pm.test('Aceptada', () => pm.expect(pm.response.code).to.eql(202));"] }
+      }]
+    },
+    {
+      "name": "Consultar guía (404/202/200 durante procesamiento)",
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/guias/{{numeroGuia}}" }
+    },
+    {
+      "name": "Listar guías",
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/guias" }
+    },
+    {
+      "name": "Actualizar guía completada",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"transportista\": \"diego.alvarez.e@ug.uchile.cl\",\n  \"fecha\": \"2026-07-12\",\n  \"destino\": \"Valparaiso\",\n  \"pedido\": \"PED-1001-A\"\n}"
+        },
+        "url": "{{baseUrl}}/api/guias/{{numeroGuia}}"
+      }
+    },
+    {
+      "name": "Descargar PDF S3 (GUIAS_DESCARGA)",
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/guias/{{numeroGuia}}/s3" }
+    },
+    {
+      "name": "Re-subir a S3",
+      "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/api/guias/{{numeroGuia}}/s3" }
+    },
+    {
+      "name": "Eliminar guía completada",
+      "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/api/guias/{{numeroGuia}}" }
+    },
+    {
+      "name": "Sin token (debe dar 401)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/guias"
+      }
+    }
+  ]
+}
