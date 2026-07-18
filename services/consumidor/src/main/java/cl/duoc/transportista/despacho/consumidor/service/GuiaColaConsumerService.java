@@ -1,17 +1,15 @@
 package cl.duoc.transportista.despacho.consumidor.service;
 
 import cl.duoc.transportista.despacho.consumidor.dto.GuiaColaMensaje;
-import cl.duoc.transportista.despacho.consumidor.model.GuiaDespachoRegistro;
 import com.rabbitmq.client.Channel;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.core.exception.SdkClientException;
-import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Service
 public class GuiaColaConsumerService {
   private final GuiaRegistroPersistenceService registros;
+
   GuiaColaConsumerService(GuiaRegistroPersistenceService registros) {
     this.registros = registros;
   }

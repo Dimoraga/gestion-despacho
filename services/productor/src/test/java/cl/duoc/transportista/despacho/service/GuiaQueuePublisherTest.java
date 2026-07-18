@@ -73,7 +73,8 @@ class GuiaQueuePublisherTest {
         processor.getValue().postProcessMessage(new Message(new byte[0], new MessageProperties()));
     assertEquals(
         MessageDeliveryMode.PERSISTENT, published.getMessageProperties().getDeliveryMode());
-    assertEquals("a14bb491-06bd-4348-a2e4-6d7a8d3f121e", published.getMessageProperties().getMessageId());
+    assertEquals(
+        "a14bb491-06bd-4348-a2e4-6d7a8d3f121e", published.getMessageProperties().getMessageId());
     assertEquals(
         GuiaColaMensaje.CONTRACT_VERSION,
         published.getMessageProperties().getHeader("x-contract-version"));

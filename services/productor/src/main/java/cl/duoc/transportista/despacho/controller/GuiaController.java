@@ -35,5 +35,4 @@ public class GuiaController {
         .location(URI.create("/api/solicitudes/" + r.requestId()))
         .body(r);
   }
-
 }

@@ -20,7 +20,8 @@ public class GuiaRequestDeserializer extends StdDeserializer<GuiaRequest> {
   }
 
   @Override
-  public GuiaRequest deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+  public GuiaRequest deserialize(JsonParser parser, DeserializationContext context)
+      throws IOException {
     JsonNode node = parser.getCodec().readTree(parser);
     for (String identifier : FORBIDDEN_IDENTIFIERS) {
       if (node.has(identifier)) {

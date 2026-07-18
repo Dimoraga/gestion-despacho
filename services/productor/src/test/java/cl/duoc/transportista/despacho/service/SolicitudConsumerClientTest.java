@@ -12,8 +12,8 @@ import org.mockito.Mockito;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestOperations;
 
 class SolicitudConsumerClientTest {
   private static final String REQUEST_ID = "a14bb491-06bd-4348-a2e4-6d7a8d3f121e";
@@ -25,7 +25,9 @@ class SolicitudConsumerClientTest {
   void consultar_404Interno_indicaQueAunNoHayObservacion() {
     when(restOperations.getForObject(
             eq("/api/solicitudes/{requestId}"), eq(SolicitudResponse.class), eq(REQUEST_ID)))
-        .thenThrow(HttpClientErrorException.create(HttpStatus.NOT_FOUND, "Not Found", HttpHeaders.EMPTY, null, null));
+        .thenThrow(
+            HttpClientErrorException.create(
+                HttpStatus.NOT_FOUND, "Not Found", HttpHeaders.EMPTY, null, null));
 
     assertTrue(client.consultar(REQUEST_ID).isEmpty());
   }

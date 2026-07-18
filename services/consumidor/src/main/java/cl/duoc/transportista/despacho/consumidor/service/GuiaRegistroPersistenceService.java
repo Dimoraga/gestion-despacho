@@ -12,7 +12,6 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.springframework.http.HttpStatus;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,7 +70,8 @@ public class GuiaRegistroPersistenceService {
     s.setFingerprint(fingerprint);
     s.setNumeroGuia(numeroGuia);
     s.setRecibidaEn(Instant.now());
-    solicitudes.saveAndFlush(s); // Same rule: retry in a fresh transaction, never continue rollback-only.
+    solicitudes.saveAndFlush(
+        s); // Same rule: retry in a fresh transaction, never continue rollback-only.
   }
 
   @Transactional
@@ -86,7 +86,13 @@ public class GuiaRegistroPersistenceService {
   }
 
   @Transactional
-  public boolean marcarFase(Long id, String token, Long fence, FaseProcesamiento anterior, FaseProcesamiento siguiente, String checksum) {
+  public boolean marcarFase(
+      Long id,
+      String token,
+      Long fence,
+      FaseProcesamiento anterior,
+      FaseProcesamiento siguiente,
+      String checksum) {
     return repo.marcarFase(id, token, fence, anterior, siguiente, checksum, Instant.now()) == 1;
   }
 
@@ -99,19 +105,28 @@ public class GuiaRegistroPersistenceService {
   @Transactional
   public boolean reintentar(Long id, String token, Long fence, Exception error) {
     String detalle = error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage());
-    return repo.marcarRetry(id, token, fence, detalle.substring(0, Math.min(detalle.length(), 2000))) == 1;
+    return repo.marcarRetry(
+            id, token, fence, detalle.substring(0, Math.min(detalle.length(), 2000)))
+        == 1;
   }
 
   @Transactional
   public boolean fallar(Long id, String token, Long fence, Exception error) {
     String detalle = error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage());
-    return repo.marcarFailed(id, token, fence, detalle.substring(0, Math.min(detalle.length(), 2000))) == 1;
+    return repo.marcarFailed(
+            id, token, fence, detalle.substring(0, Math.min(detalle.length(), 2000)))
+        == 1;
   }
 
   @Transactional(readOnly = true)
   public List<GuiaDespachoRegistro> candidatos() {
     Instant now = Instant.now();
-    return repo.findByEstadoIn(List.of(EstadoProcesamiento.PENDING, EstadoProcesamiento.RETRY, EstadoProcesamiento.PROCESSING))
+    return repo
+        .findByEstadoIn(
+            List.of(
+                EstadoProcesamiento.PENDING,
+                EstadoProcesamiento.RETRY,
+                EstadoProcesamiento.PROCESSING))
         .stream()
         .filter(
             r ->
@@ -142,10 +157,15 @@ public class GuiaRegistroPersistenceService {
         solicitudes
             .findByRequestId(requestId)
             .orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud no observada todavía"));
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Solicitud no observada todavía"));
     GuiaDespachoRegistro guia = repo.findByNumeroGuia(solicitud.getNumeroGuia()).orElseThrow();
     return new SolicitudResponse(
-        solicitud.getRequestId(), guia.getNumeroGuia(), guia.getEstado().name(), guia.getUltimoError());
+        solicitud.getRequestId(),
+        guia.getNumeroGuia(),
+        guia.getEstado().name(),
+        guia.getUltimoError());
   }
 
   @Transactional(readOnly = true)
@@ -249,14 +269,16 @@ public class GuiaRegistroPersistenceService {
     return uppercase ? normalizado.toUpperCase(Locale.ROOT) : normalizado.toLowerCase(Locale.ROOT);
   }
 
-
   public static class PayloadConflictException extends RuntimeException {}
 
   public static class UnsupportedEventException extends RuntimeException {}
 
   private boolean uuidCanonico(String value) {
-    try { return value != null && UUID.fromString(value).toString().equals(value); }
-    catch (IllegalArgumentException e) { return false; }
+    try {
+      return value != null && UUID.fromString(value).toString().equals(value);
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   private boolean fueraDeLimite(String value, int maximo) {

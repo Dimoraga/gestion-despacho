@@ -11,7 +11,8 @@ class SolicitudControllerTest {
   @Test
   void devuelveEstadoDurableDeSolicitud() {
     GuiaRegistroPersistenceService registros = mock(GuiaRegistroPersistenceService.class);
-    SolicitudResponse esperada = new SolicitudResponse("11111111-1111-1111-1111-111111111111", 42L, "RETRY", "EFS denied");
+    SolicitudResponse esperada =
+        new SolicitudResponse("11111111-1111-1111-1111-111111111111", 42L, "RETRY", "EFS denied");
     when(registros.consultarSolicitud(esperada.requestId())).thenReturn(esperada);
 
     SolicitudResponse actual = new SolicitudController(registros).obtener(esperada.requestId());

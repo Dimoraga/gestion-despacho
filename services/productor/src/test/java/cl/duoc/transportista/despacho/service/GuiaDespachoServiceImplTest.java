@@ -2,8 +2,8 @@ package cl.duoc.transportista.despacho.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import cl.duoc.transportista.despacho.dto.GuiaColaMensaje;
 import cl.duoc.transportista.despacho.dto.GuiaRequest;

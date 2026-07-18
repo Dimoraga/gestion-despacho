@@ -1,9 +1,9 @@
 package cl.duoc.transportista.despacho.consumidor.service;
 
 import java.io.*;
+import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.HexFormat;
-import java.nio.file.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -54,8 +54,11 @@ public class EfsStorageService {
   }
 
   public byte[] leer(String key) {
-    try { return Files.readAllBytes(seguro(key)); }
-    catch (IOException e) { throw new UncheckedIOException(e); }
+    try {
+      return Files.readAllBytes(seguro(key));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   private void adoptar(Path path, String esperado) throws IOException {
@@ -64,8 +67,11 @@ public class EfsStorageService {
   }
 
   private String checksum(byte[] bytes) {
-    try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }
-    catch (Exception e) { throw new IllegalStateException(e); }
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   private Path seguro(String key) {

@@ -19,7 +19,8 @@ public class SolicitudConsumerClient {
   public Optional<SolicitudResponse> consultar(String requestId) {
     try {
       return Optional.ofNullable(
-          restOperations.getForObject("/api/solicitudes/{requestId}", SolicitudResponse.class, requestId));
+          restOperations.getForObject(
+              "/api/solicitudes/{requestId}", SolicitudResponse.class, requestId));
     } catch (HttpClientErrorException ex) {
       if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
         return Optional.empty();

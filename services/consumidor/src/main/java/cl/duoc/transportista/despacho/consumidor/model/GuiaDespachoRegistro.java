@@ -21,7 +21,10 @@ public class GuiaDespachoRegistro {
 
   @Id
   @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "guia_despacho_registro_seq")
-  @SequenceGenerator(name = "guia_despacho_registro_seq", sequenceName = "guia_despacho_registro_seq", allocationSize = 1)
+  @SequenceGenerator(
+      name = "guia_despacho_registro_seq",
+      sequenceName = "guia_despacho_registro_seq",
+      allocationSize = 1)
   private Long id;
 
   private Long numeroGuia;
@@ -33,6 +36,7 @@ public class GuiaDespachoRegistro {
   private String efsPath;
   private String payloadHash;
   private Integer versionEvento;
+
   @Column(nullable = false)
   private boolean eliminada;
 
@@ -49,8 +53,10 @@ public class GuiaDespachoRegistro {
   private Instant leaseExpiraEn;
   private Long fence = 0L;
   private String checksum;
+
   @Column(length = 2000)
   private String ultimoError;
+
   private Integer retryCount = 0;
   private Instant retryAt;
 }

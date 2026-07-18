@@ -36,9 +36,13 @@ public class S3StorageService {
           RequestBody.fromBytes(bytes));
     } catch (S3Exception e) {
       if (e.statusCode() != 412) throw e;
-      String existing = client.headObject(HeadObjectRequest.builder().bucket(bucket).key(key).build())
-          .metadata().get("sha256");
-      if (!checksum.equals(existing)) throw new IllegalStateException("S3 key exists with another checksum", e);
+      String existing =
+          client
+              .headObject(HeadObjectRequest.builder().bucket(bucket).key(key).build())
+              .metadata()
+              .get("sha256");
+      if (!checksum.equals(existing))
+        throw new IllegalStateException("S3 key exists with another checksum", e);
     }
   }
 

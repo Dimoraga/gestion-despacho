@@ -11,7 +11,8 @@ class GuiaFingerprintTest {
   @Test
   void calcular_aplicaLaCanonicalizacionCompartidaConConsumidor() {
     GuiaRequest original =
-        new GuiaRequest("  Transporte\u00a0Norte ", LocalDate.of(2026, 7, 18), " SANTIAGO\tCENTRO ", "ped-01");
+        new GuiaRequest(
+            "  Transporte\u00a0Norte ", LocalDate.of(2026, 7, 18), " SANTIAGO\tCENTRO ", "ped-01");
     GuiaRequest canonical =
         new GuiaRequest("transporte norte", LocalDate.of(2026, 7, 18), "santiago centro", "PED-01");
 

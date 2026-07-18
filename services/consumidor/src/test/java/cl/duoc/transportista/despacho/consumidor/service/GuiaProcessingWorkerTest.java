@@ -9,11 +9,13 @@ import java.nio.file.AccessDeniedException;
 import org.junit.jupiter.api.Test;
 
 class GuiaProcessingWorkerTest {
-  private final GuiaRegistroPersistenceService registros = mock(GuiaRegistroPersistenceService.class);
+  private final GuiaRegistroPersistenceService registros =
+      mock(GuiaRegistroPersistenceService.class);
   private final GuiaPdfService pdf = mock(GuiaPdfService.class);
   private final EfsStorageService efs = mock(EfsStorageService.class);
   private final S3StorageService s3 = mock(S3StorageService.class);
-  private final GuiaProcessingWorker worker = new GuiaProcessingWorker(registros, pdf, efs, s3, 60, 5);
+  private final GuiaProcessingWorker worker =
+      new GuiaProcessingWorker(registros, pdf, efs, s3, 60, 5);
 
   @Test
   void errorDeEfsMarcaRetryYNoEscapaDelWorker() {
@@ -44,8 +46,14 @@ class GuiaProcessingWorkerTest {
     when(registros.obtener(42L)).thenReturn(guia);
     when(registros.renovarLease(eq(7L), anyString(), eq(4L), any())).thenReturn(true);
     when(efs.leer(guia.getArchivoKey())).thenReturn(bytes);
-    when(registros.marcarFase(eq(7L), anyString(), eq(4L), eq(FaseProcesamiento.EFS_WRITTEN),
-        eq(FaseProcesamiento.S3_WRITTEN), anyString())).thenReturn(true);
+    when(registros.marcarFase(
+            eq(7L),
+            anyString(),
+            eq(4L),
+            eq(FaseProcesamiento.EFS_WRITTEN),
+            eq(FaseProcesamiento.S3_WRITTEN),
+            anyString()))
+        .thenReturn(true);
 
     worker.processOne(guia);
 

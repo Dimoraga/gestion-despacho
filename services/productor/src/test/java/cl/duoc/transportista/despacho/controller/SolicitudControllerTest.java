@@ -70,11 +70,12 @@ class SolicitudControllerTest {
 
   @Test
   void consultar_requiereRolDeGestion() throws Exception {
-    mockMvc.perform(get("/api/solicitudes/{requestId}", REQUEST_ID)).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/solicitudes/{requestId}", REQUEST_ID))
+        .andExpect(status().isUnauthorized());
   }
 
   private org.springframework.test.web.servlet.request.RequestPostProcessor gestionGuiasJwt() {
-    return jwt()
-        .authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS));
+    return jwt().authorities(new SimpleGrantedAuthority("ROLE_" + SecurityRoles.GESTION_GUIAS));
   }
 }

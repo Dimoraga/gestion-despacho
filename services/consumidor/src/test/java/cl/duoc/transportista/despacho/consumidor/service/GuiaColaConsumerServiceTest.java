@@ -4,8 +4,8 @@ import static org.mockito.Mockito.*;
 
 import cl.duoc.transportista.despacho.consumidor.dto.GuiaColaMensaje;
 import cl.duoc.transportista.despacho.consumidor.model.*;
-import com.rabbitmq.client.Channel;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rabbitmq.client.Channel;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
@@ -18,7 +18,13 @@ class GuiaColaConsumerServiceTest {
   private final GuiaColaConsumerService listener = new GuiaColaConsumerService(registros);
   private final GuiaColaMensaje event =
       new GuiaColaMensaje(
-          Integer.valueOf(2), "request-1", "fingerprint", "transporte", LocalDate.now(), "destino", "pedido");
+          Integer.valueOf(2),
+          "request-1",
+          "fingerprint",
+          "transporte",
+          LocalDate.now(),
+          "destino",
+          "pedido");
 
   @Test
   void haceAckSoloDespuesDePersistir() throws Exception {
@@ -57,11 +63,13 @@ class GuiaColaConsumerServiceTest {
 
   @Test
   void deserializaContratoProductorV2SinNumeroGuiaNiArchivoKey() throws Exception {
-    String json = """
+    String json =
+        """
         {"version":2,"requestId":"req-1","fingerprint":"abc","transportista":"transporte",
         "fecha":"2026-01-02","destino":"destino","pedido":"pedido"}
         """;
-    GuiaColaMensaje mensaje = new ObjectMapper().findAndRegisterModules().readValue(json, GuiaColaMensaje.class);
+    GuiaColaMensaje mensaje =
+        new ObjectMapper().findAndRegisterModules().readValue(json, GuiaColaMensaje.class);
     org.assertj.core.api.Assertions.assertThat(mensaje.requestId()).isEqualTo("req-1");
     org.assertj.core.api.Assertions.assertThat(mensaje.pedido()).isEqualTo("pedido");
   }

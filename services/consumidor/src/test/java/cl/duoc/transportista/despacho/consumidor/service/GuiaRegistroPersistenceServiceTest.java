@@ -8,15 +8,16 @@ import cl.duoc.transportista.despacho.consumidor.dto.GuiaColaMensaje;
 import cl.duoc.transportista.despacho.consumidor.model.*;
 import cl.duoc.transportista.despacho.consumidor.repository.GuiaDespachoRegistroRepository;
 import cl.duoc.transportista.despacho.consumidor.repository.SolicitudDespachoRepository;
-import java.time.LocalDate;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class GuiaRegistroPersistenceServiceTest {
   private final GuiaDespachoRegistroRepository repo = mock(GuiaDespachoRegistroRepository.class);
   private final SolicitudDespachoRepository solicitudes = mock(SolicitudDespachoRepository.class);
-  private final GuiaRegistroPersistenceService service = new GuiaRegistroPersistenceService(repo, solicitudes);
+  private final GuiaRegistroPersistenceService service =
+      new GuiaRegistroPersistenceService(repo, solicitudes);
   private final GuiaColaMensaje message = mensaje("11111111-1111-1111-1111-111111111111", null);
 
   @Test
@@ -50,8 +51,14 @@ class GuiaRegistroPersistenceServiceTest {
   @Test
   void rechazaVersionDeEventoNoSoportada() {
     GuiaColaMensaje incompatible =
-        new GuiaColaMensaje(1, "11111111-1111-1111-1111-111111111111", "invalid", "transporte", LocalDate.of(2026, 1, 2),
-            "Santiago", "PED-1");
+        new GuiaColaMensaje(
+            1,
+            "11111111-1111-1111-1111-111111111111",
+            "invalid",
+            "transporte",
+            LocalDate.of(2026, 1, 2),
+            "Santiago",
+            "PED-1");
     assertThatThrownBy(() -> service.preparar(incompatible))
         .isInstanceOf(GuiaRegistroPersistenceService.UnsupportedEventException.class);
   }
@@ -91,7 +98,8 @@ class GuiaRegistroPersistenceServiceTest {
   void registraRetrySoloParaElFenceQuePoseeElLease() {
     when(repo.marcarRetry(eq(42L), eq("lease-a"), eq(3L), contains("AccessDeniedException")))
         .thenReturn(1);
-    assertThat(service.reintentar(42L, "lease-a", 3L, new java.nio.file.AccessDeniedException("/efs")))
+    assertThat(
+            service.reintentar(42L, "lease-a", 3L, new java.nio.file.AccessDeniedException("/efs")))
         .isTrue();
     when(repo.marcarRetry(eq(42L), eq("lease-vencido"), eq(2L), anyString())).thenReturn(0);
     assertThat(service.reintentar(42L, "lease-vencido", 2L, new IllegalStateException("old")))
@@ -114,10 +122,16 @@ class GuiaRegistroPersistenceServiceTest {
   }
 
   private GuiaColaMensaje mensaje(String requestId, String providedFingerprint) {
-    GuiaColaMensaje provisional = new GuiaColaMensaje(2, requestId, "x", "transporte",
-        LocalDate.of(2026, 1, 2), "Santiago", "PED-1");
-    return new GuiaColaMensaje(2, requestId,
+    GuiaColaMensaje provisional =
+        new GuiaColaMensaje(
+            2, requestId, "x", "transporte", LocalDate.of(2026, 1, 2), "Santiago", "PED-1");
+    return new GuiaColaMensaje(
+        2,
+        requestId,
         providedFingerprint == null ? service.fingerprint(provisional) : providedFingerprint,
-        "transporte", LocalDate.of(2026, 1, 2), "Santiago", "PED-1");
+        "transporte",
+        LocalDate.of(2026, 1, 2),
+        "Santiago",
+        "PED-1");
   }
 }
