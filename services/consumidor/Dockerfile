@@ -3,11 +3,11 @@
 FROM maven:3.9-eclipse-temurin-17 AS deps
 WORKDIR /build
 COPY pom.xml .
-RUN --mount=type=cache,target=/root/.m2 mvn -B -q dependency:go-offline
+RUN mvn -B -q dependency:go-offline
 
 FROM deps AS build
 COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 mvn -B -q clean package -DskipTests
+RUN mvn -B -q clean package -DskipTests
 
 FROM eclipse-temurin:17-jdk-jammy AS extract
 WORKDIR /builder

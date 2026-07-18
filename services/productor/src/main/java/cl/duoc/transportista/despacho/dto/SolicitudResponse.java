@@ -1,0 +1,3 @@
+package cl.duoc.transportista.despacho.dto;
+
+public record SolicitudResponse(String requestId, Long numeroGuia, String estado, String error) {}

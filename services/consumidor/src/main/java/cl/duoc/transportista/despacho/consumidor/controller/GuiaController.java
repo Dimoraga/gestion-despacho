@@ -103,10 +103,8 @@ public class GuiaController {
   }
 
   private void almacenar(GuiaDespachoRegistro r) {
-    byte[] bytes = pdf.generar(r);
-    var path = efs.guardar(r.getArchivoKey(), bytes);
-    s3.subir(r.getArchivoKey(), bytes);
-    registros.completar(r.getId(), path.toString());
+    throw new ResponseStatusException(
+        HttpStatus.CONFLICT, "El procesamiento de artefactos es exclusivo del worker con lease");
   }
 
   private GuiaResponse response(GuiaDespachoRegistro r) {

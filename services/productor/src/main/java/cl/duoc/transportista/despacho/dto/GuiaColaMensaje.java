@@ -4,14 +4,14 @@ import java.time.LocalDate;
 
 public record GuiaColaMensaje(
     Integer version,
-    Long numeroGuia,
+    String requestId,
+    String fingerprint,
     String transportista,
     LocalDate fecha,
     String destino,
-    String pedido,
-    String archivoKey) {
+    String pedido) {
 
-  public static final Integer CONTRACT_VERSION = 1;
+  public static final Integer CONTRACT_VERSION = 2;
 
   public GuiaColaMensaje {
     if (!CONTRACT_VERSION.equals(version)) {

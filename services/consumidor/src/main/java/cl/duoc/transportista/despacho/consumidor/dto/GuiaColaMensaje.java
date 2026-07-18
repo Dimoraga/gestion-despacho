@@ -4,9 +4,9 @@ import java.time.LocalDate;
 
 public record GuiaColaMensaje(
     Integer version,
-    Long numeroGuia,
+    String requestId,
+    String fingerprint,
     String transportista,
     LocalDate fecha,
     String destino,
-    String pedido,
-    String archivoKey) {}
+    String pedido) {}

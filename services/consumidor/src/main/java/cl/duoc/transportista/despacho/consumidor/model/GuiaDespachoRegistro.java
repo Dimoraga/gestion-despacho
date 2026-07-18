@@ -10,15 +10,18 @@ import lombok.Setter;
 @Entity
 @Table(
     name = "guia_despacho_registro",
-    uniqueConstraints =
-        @UniqueConstraint(name = "uk_registro_numero_guia", columnNames = "numero_guia"))
+    uniqueConstraints = {
+      @UniqueConstraint(name = "uk_registro_numero_guia", columnNames = "numero_guia"),
+      @UniqueConstraint(name = "uk_registro_payload_hash", columnNames = "payload_hash")
+    })
 @Getter
 @Setter
 @NoArgsConstructor
 public class GuiaDespachoRegistro {
 
   @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "guia_despacho_registro_seq")
+  @SequenceGenerator(name = "guia_despacho_registro_seq", sequenceName = "guia_despacho_registro_seq", allocationSize = 1)
   private Long id;
 
   private Long numeroGuia;
@@ -30,6 +33,7 @@ public class GuiaDespachoRegistro {
   private String efsPath;
   private String payloadHash;
   private Integer versionEvento;
+  @Column(nullable = false)
   private boolean eliminada;
 
   @Enumerated(EnumType.STRING)
@@ -37,4 +41,16 @@ public class GuiaDespachoRegistro {
 
   private Instant fechaInicioProcesamiento;
   private Instant fechaProcesado;
+
+  @Enumerated(EnumType.STRING)
+  private FaseProcesamiento fase = FaseProcesamiento.PENDING;
+
+  private String leaseToken;
+  private Instant leaseExpiraEn;
+  private Long fence = 0L;
+  private String checksum;
+  @Column(length = 2000)
+  private String ultimoError;
+  private Integer retryCount = 0;
+  private Instant retryAt;
 }

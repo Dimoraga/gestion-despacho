@@ -5,7 +5,6 @@ import cl.duoc.transportista.despacho.dto.GuiaResponse;
 import cl.duoc.transportista.despacho.service.GuiaDespachoService;
 import jakarta.validation.Valid;
 import java.net.URI;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,20 +24,16 @@ public class GuiaController {
 
   @PostMapping
   public ResponseEntity<GuiaResponse> crear(
-      @RequestHeader("Idempotency-Key") String idempotencyKey,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
       @Valid @RequestBody GuiaRequest req) {
-    long numeroGuia;
-    try {
-      numeroGuia = Long.parseLong(idempotencyKey);
-    } catch (NumberFormatException ex) {
+    if (idempotencyKey != null) {
       throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "Idempotency-Key debe ser un entero positivo");
+          org.springframework.http.HttpStatus.BAD_REQUEST, "Idempotency-Key no está soportado");
     }
-    if (numeroGuia <= 0) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "Idempotency-Key debe ser un entero positivo");
-    }
-    GuiaResponse r = service.crear(req, numeroGuia);
-    return ResponseEntity.accepted().location(URI.create("/api/guias/" + r.numeroGuia())).body(r);
+    GuiaResponse r = service.crear(req);
+    return ResponseEntity.accepted()
+        .location(URI.create("/api/solicitudes/" + r.requestId()))
+        .body(r);
   }
+
 }
