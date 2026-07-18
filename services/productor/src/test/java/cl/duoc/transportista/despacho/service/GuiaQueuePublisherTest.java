@@ -39,12 +39,12 @@ class GuiaQueuePublisherTest {
     mensaje =
         new GuiaColaMensaje(
             GuiaColaMensaje.CONTRACT_VERSION,
-            1L,
+            "a14bb491-06bd-4348-a2e4-6d7a8d3f121e",
+            "08d815d3e42a15c6d1d55cbaf5d28fbbdff5d8c555677a8af6cd2e1c715e809c",
             "transportistaX",
             LocalDate.of(2021, 3, 15),
             "Santiago",
-            "PED-001",
-            "key.pdf");
+            "PED-001");
   }
 
   @Test
@@ -73,7 +73,8 @@ class GuiaQueuePublisherTest {
         processor.getValue().postProcessMessage(new Message(new byte[0], new MessageProperties()));
     assertEquals(
         MessageDeliveryMode.PERSISTENT, published.getMessageProperties().getDeliveryMode());
-    assertEquals("1", published.getMessageProperties().getMessageId());
+    assertEquals(
+        "a14bb491-06bd-4348-a2e4-6d7a8d3f121e", published.getMessageProperties().getMessageId());
     assertEquals(
         GuiaColaMensaje.CONTRACT_VERSION,
         published.getMessageProperties().getHeader("x-contract-version"));
@@ -101,6 +102,12 @@ class GuiaQueuePublisherTest {
         IllegalArgumentException.class,
         () ->
             new GuiaColaMensaje(
-                2, 1L, "transportistaX", LocalDate.of(2021, 3, 15), "Santiago", "PED-001", null));
+                3,
+                "a14bb491-06bd-4348-a2e4-6d7a8d3f121e",
+                "08d815d3e42a15c6d1d55cbaf5d28fbbdff5d8c555677a8af6cd2e1c715e809c",
+                "transportistaX",
+                LocalDate.of(2021, 3, 15),
+                "Santiago",
+                "PED-001"));
   }
 }

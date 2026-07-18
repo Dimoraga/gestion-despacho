@@ -91,11 +91,15 @@ jobs:
             fi
             printf '%s\n' 'Creando archivo de entorno protegido...'
             cat > ~/.env << EOF
+            DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             APP_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho:${{ github.sha }}
             CONSUMIDOR_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/gestion-despacho-consumidor:${{ github.sha }}
             APP_EFS_DIR=/app/efs
             HOST_EFS_DIR=/mnt/efs/gestion-despacho-consumidor
-            CONSUMIDOR_SPRING_DATASOURCE_URL=jdbc:h2:file:/app/efs/h2/guias-registro;DB_CLOSE_DELAY=-1
+            CONSUMIDOR_SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//oracle:1521/FREEPDB1
+            ORACLE_SYSTEM_PASSWORD=${{ secrets.ORACLE_SYSTEM_PASSWORD }}
+            ORACLE_APP_USER=${{ secrets.ORACLE_APP_USER }}
+            ORACLE_APP_PASSWORD=${{ secrets.ORACLE_APP_PASSWORD }}
             AWS_REGION=${{ secrets.AWS_REGION }}
             AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -109,6 +113,23 @@ jobs:
             AZURE_JWK_SET_URI=${{ secrets.AZURE_JWK_SET_URI }}
             AZURE_ROLES_CLAIM=${{ secrets.AZURE_ROLES_CLAIM || 'roles' }}
             EOF
+            require_env() {
+              variable_name="$1"
+              variable_value=""
+              while IFS='=' read -r name value; do
+                if [ "$name" = "$variable_name" ]; then
+                  variable_value="$value"
+                  break
+                fi
+              done < ~/.env
+              if [ -z "$variable_value" ]; then
+                printf '%s\n' "Error: la variable obligatoria $variable_name no fue proporcionada para el despliegue." >&2
+                exit 1
+              fi
+            }
+            for required_variable in DOCKERHUB_USERNAME APP_IMAGE CONSUMIDOR_IMAGE HOST_EFS_DIR APP_EFS_DIR RABBITMQ_USER RABBITMQ_PASS CONSUMIDOR_SPRING_DATASOURCE_URL ORACLE_SYSTEM_PASSWORD ORACLE_APP_USER ORACLE_APP_PASSWORD; do
+              require_env "$required_variable"
+            done
             cd ~
             EFS_MOUNT=/mnt/efs
             EFS_CONSUMIDOR_DIR="$EFS_MOUNT/gestion-despacho-consumidor"

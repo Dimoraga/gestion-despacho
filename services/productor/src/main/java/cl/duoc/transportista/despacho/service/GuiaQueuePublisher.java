@@ -32,14 +32,14 @@ public class GuiaQueuePublisher {
     if (!GuiaColaMensaje.CONTRACT_VERSION.equals(mensaje.version())) {
       throw new IllegalArgumentException("Versión de contrato no soportada: " + mensaje.version());
     }
-    CorrelationData correlation = new CorrelationData(mensaje.numeroGuia().toString());
+    CorrelationData correlation = new CorrelationData(mensaje.requestId());
     rabbitTemplate.convertAndSend(
         exchangeName,
         routingKey,
         mensaje,
         message -> {
           message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-          message.getMessageProperties().setMessageId(mensaje.numeroGuia().toString());
+          message.getMessageProperties().setMessageId(mensaje.requestId());
           message.getMessageProperties().setType("guia.creada");
           message.getMessageProperties().setHeader("x-contract-version", mensaje.version());
           return message;
@@ -49,10 +49,10 @@ public class GuiaQueuePublisher {
       CorrelationData.Confirm confirm =
           correlation.getFuture().get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);
       if (!confirm.isAck()) {
-        throw new AmqpException("RabbitMQ rechazó la publicación de guía " + mensaje.numeroGuia());
+        throw new AmqpException("RabbitMQ rechazó la publicación de guía " + mensaje.requestId());
       }
       if (correlation.getReturned() != null) {
-        throw new AmqpException("RabbitMQ devolvió la publicación de guía " + mensaje.numeroGuia());
+        throw new AmqpException("RabbitMQ devolvió la publicación de guía " + mensaje.requestId());
       }
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();

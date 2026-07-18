@@ -22,6 +22,30 @@ public class S3StorageService {
         RequestBody.fromBytes(bytes));
   }
 
+  /** Creates the deterministic object once. A 412 is safe only when its stored checksum matches. */
+  public void subirSiAusente(String key, byte[] bytes, String checksum) {
+    try {
+      client.putObject(
+          PutObjectRequest.builder()
+              .bucket(bucket)
+              .key(key)
+              .contentType("application/pdf")
+              .metadata(java.util.Map.of("sha256", checksum))
+              .ifNoneMatch("*")
+              .build(),
+          RequestBody.fromBytes(bytes));
+    } catch (S3Exception e) {
+      if (e.statusCode() != 412) throw e;
+      String existing =
+          client
+              .headObject(HeadObjectRequest.builder().bucket(bucket).key(key).build())
+              .metadata()
+              .get("sha256");
+      if (!checksum.equals(existing))
+        throw new IllegalStateException("S3 key exists with another checksum", e);
+    }
+  }
+
   public byte[] descargar(String key) {
     return client
         .getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build())

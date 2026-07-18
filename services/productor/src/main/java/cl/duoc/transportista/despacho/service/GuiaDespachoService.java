@@ -5,5 +5,5 @@ import cl.duoc.transportista.despacho.dto.GuiaResponse;
 
 public interface GuiaDespachoService {
 
-  GuiaResponse crear(GuiaRequest request, Long numeroGuia);
+  GuiaResponse crear(GuiaRequest request);
 }
